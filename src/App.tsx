@@ -72,7 +72,7 @@ export default function App() {
 
   // Multi-tracker state
   const [trackers, setTrackers] = useState<TrackerInfo[]>([]);
-  const [isCreatingTracker, setIsCreatingTracker] = useState(false);
+  const [isNewTrackerModalOpen, setIsNewTrackerModalOpen] = useState(false);
   const [newTrackerName, setNewTrackerName] = useState("");
   const [trackerCreateLoading, setTrackerCreateLoading] = useState(false);
   const [shareModalTracker, setShareModalTracker] = useState<TrackerInfo | null>(null);
@@ -82,6 +82,7 @@ export default function App() {
   const [shareResult, setShareResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [deletingTrackerId, setDeletingTrackerId] = useState<string | null>(null);
   const newTrackerInputRef = useRef<HTMLInputElement>(null);
+  const joinedTrackerIdsRef = useRef<Set<string>>(new Set());
 
   // Close profile dropdown when clicking outside
   useEffect(() => {
@@ -96,12 +97,12 @@ export default function App() {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [isProfileMenuOpen]);
 
-  // Focus new tracker input when form appears
+  // Focus new tracker name input when modal opens
   useEffect(() => {
-    if (isCreatingTracker && newTrackerInputRef.current) {
-      newTrackerInputRef.current.focus();
+    if (isNewTrackerModalOpen && newTrackerInputRef.current) {
+      setTimeout(() => newTrackerInputRef.current?.focus(), 80);
     }
-  }, [isCreatingTracker]);
+  }, [isNewTrackerModalOpen]);
 
   const [friends, setFriends] = useState<Friend[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -222,7 +223,7 @@ export default function App() {
       const newTracker: TrackerInfo = await res.json();
       setTrackers(prev => [...prev, newTracker]);
       setNewTrackerName("");
-      setIsCreatingTracker(false);
+      setIsNewTrackerModalOpen(false);
       // Switch to the newly created tracker
       handleSwitchTracker(newTracker);
       setToast(`Tracker "${newTracker.name}" created!`);
@@ -402,6 +403,7 @@ export default function App() {
   }, [googleClientId, token, showMockLogin]);
 
   // Fetch shared tracker info if viewing someone else's tracker
+  // The GET /api/trackers/:id endpoint also auto-joins the viewer to tracker_shares.
   useEffect(() => {
     if (!token || !trackerId) return;
     if (defaultTrackerId && trackerId === defaultTrackerId) {
@@ -412,19 +414,43 @@ export default function App() {
     const fetchTrackerInfo = async () => {
       try {
         const res = await fetch(`/api/trackers/${trackerId}`, {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
+          headers: { "Authorization": `Bearer ${token}` }
         });
         if (res.ok) {
           const info = await res.json();
           setSharedTrackerInfo(info);
+          // Refresh sidebar list so the auto-joined tracker appears there
+          await fetchTrackers(token);
+          // Show a welcome toast the first time this session we join this tracker
+          if (!joinedTrackerIdsRef.current.has(trackerId)) {
+            joinedTrackerIdsRef.current.add(trackerId);
+            setToast(`\u201c${info.name}\u201d added to your trackers!`);
+            setTimeout(() => setToast(null), 4000);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch tracker info:", err);
       }
     };
     fetchTrackerInfo();
+  }, [token, trackerId, defaultTrackerId]);
+
+  // Poll for fresh data every 30 s when viewing a tracker you don't own (shared link)
+  useEffect(() => {
+    if (!token || !trackerId || trackerId === defaultTrackerId) return;
+    const poll = setInterval(async () => {
+      try {
+        const [fRes, eRes] = await Promise.all([
+          fetch("/api/friends",  { headers: { "Authorization": `Bearer ${token}`, "x-tracker-id": trackerId } }),
+          fetch("/api/expenses", { headers: { "Authorization": `Bearer ${token}`, "x-tracker-id": trackerId } }),
+        ]);
+        if (fRes.ok) setFriends(await fRes.json());
+        if (eRes.ok) setExpenses(await eRes.json());
+      } catch (err) {
+        // silently ignore poll errors
+      }
+    }, 30_000);
+    return () => clearInterval(poll);
   }, [token, trackerId, defaultTrackerId]);
 
   // Fetch initial data from SQLite backend when token and trackerId are ready
@@ -797,6 +823,72 @@ export default function App() {
   return (
     <div className="min-h-screen pb-16 flex flex-col pt-1 bg-stone-50 dark:bg-stone-950 transition-colors" id="applet-viewport">
 
+      {/* New Tracker Modal */}
+      <AnimatePresence>
+        {isNewTrackerModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center"
+            onClick={(e) => { if (e.target === e.currentTarget) { setIsNewTrackerModalOpen(false); setNewTrackerName(""); } }}
+          >
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <motion.div
+              initial={{ y: 60, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 60, opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="relative bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-t-3xl sm:rounded-2xl shadow-2xl p-6 w-full sm:max-w-sm z-10"
+            >
+              {/* Drag handle (mobile) */}
+              <div className="w-10 h-1 bg-stone-200 dark:bg-stone-700 rounded-full mx-auto mb-5 sm:hidden" />
+
+              <button
+                onClick={() => { setIsNewTrackerModalOpen(false); setNewTrackerName(""); }}
+                className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 transition-colors hidden sm:flex"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 bg-amber-500/10 dark:bg-amber-500/15 rounded-xl flex items-center justify-center">
+                  <PlusCircle className="w-4.5 h-4.5 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-stone-900 dark:text-stone-100">New Tracker</p>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400">Give your tracker a name</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <input
+                  ref={newTrackerInputRef}
+                  type="text"
+                  placeholder="e.g. Tokyo Trip, Office Lunches..."
+                  value={newTrackerName}
+                  onChange={(e) => setNewTrackerName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateTracker();
+                    if (e.key === "Escape") { setIsNewTrackerModalOpen(false); setNewTrackerName(""); }
+                  }}
+                  className="w-full bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-3 outline-none focus:border-amber-400 dark:focus:border-amber-500 text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 transition-colors"
+                />
+                <p className="text-[10px] text-stone-400 dark:text-stone-500 px-1">Starts empty — add friends and meals after creating.</p>
+                <button
+                  onClick={handleCreateTracker}
+                  disabled={trackerCreateLoading || !newTrackerName.trim()}
+                  className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-stone-950 font-bold py-3 px-4 rounded-xl text-sm transition-colors cursor-pointer shadow-md shadow-amber-500/10 flex items-center justify-center gap-2"
+                >
+                  {trackerCreateLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+                  {trackerCreateLoading ? "Creating..." : "Create Tracker"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Share modal overlay */}
       <AnimatePresence>
         {shareModalTracker && (
@@ -968,7 +1060,7 @@ export default function App() {
           {/* Profile + tracker dropdown */}
           <div id="profile-dropdown-container" className="relative flex items-center order-2 sm:order-3">
             <button
-              onClick={() => { setIsProfileMenuOpen(!isProfileMenuOpen); setIsCreatingTracker(false); }}
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
               className="focus:outline-hidden rounded-full transition-all duration-200 active:scale-95 flex items-center justify-center p-1.5 hover:bg-stone-100 dark:hover:bg-stone-800/60"
               aria-label="Toggle profile menu"
             >
@@ -1074,54 +1166,14 @@ export default function App() {
                       })}
                     </div>
 
-                    {/* Create new tracker */}
-                    <AnimatePresence>
-                      {isCreatingTracker ? (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.15 }}
-                          className="mt-2 overflow-hidden"
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              ref={newTrackerInputRef}
-                              type="text"
-                              placeholder="Tracker name..."
-                              value={newTrackerName}
-                              onChange={(e) => setNewTrackerName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") handleCreateTracker();
-                                if (e.key === "Escape") { setIsCreatingTracker(false); setNewTrackerName(""); }
-                              }}
-                              className="flex-1 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl px-2.5 py-1.5 text-[11px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 outline-none focus:border-amber-400 dark:focus:border-amber-500 transition-colors"
-                            />
-                            <button
-                              onClick={handleCreateTracker}
-                              disabled={trackerCreateLoading || !newTrackerName.trim()}
-                              className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-stone-950 font-bold py-1.5 px-2.5 rounded-xl text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
-                            >
-                              {trackerCreateLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                            </button>
-                            <button
-                              onClick={() => { setIsCreatingTracker(false); setNewTrackerName(""); }}
-                              className="p-1.5 rounded-xl text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </motion.div>
-                      ) : (
-                        <button
-                          onClick={() => setIsCreatingTracker(true)}
-                          className="mt-1.5 w-full flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-[11px] font-semibold text-stone-500 dark:text-stone-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/15 transition-colors cursor-pointer"
-                        >
-                          <PlusCircle className="w-3.5 h-3.5" />
-                          New Tracker
-                        </button>
-                      )}
-                    </AnimatePresence>
+                    {/* New Tracker — opens a dedicated modal (mobile friendly) */}
+                    <button
+                      onClick={() => { setIsProfileMenuOpen(false); setIsNewTrackerModalOpen(true); }}
+                      className="mt-1.5 w-full flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-[11px] font-semibold text-stone-500 dark:text-stone-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/15 transition-colors cursor-pointer"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      New Tracker
+                    </button>
                   </div>
 
                   <div className="h-px bg-stone-150 dark:bg-stone-800 mx-1" />
@@ -1187,14 +1239,32 @@ export default function App() {
 
       {/* Shared Tracker Banner */}
       {sharedTrackerInfo && (
-        <div className="bg-amber-50 border-b border-amber-200 py-2.5 px-4 text-center text-xs font-semibold text-amber-800 flex items-center justify-center gap-2">
-          <span>Viewing shared tracker: <strong className="text-amber-950 font-bold">{sharedTrackerInfo.name}</strong> (owned by {sharedTrackerInfo.ownerName})</span>
-          <button
-            onClick={handleSwitchToDefault}
-            className="bg-white hover:bg-amber-100 text-amber-900 border border-amber-200/80 px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wide cursor-pointer transition-colors"
-          >
-            Back to My Tracker
-          </button>
+        <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800/40 py-2.5 px-4 text-center text-xs font-semibold text-amber-800 dark:text-amber-300 flex flex-wrap items-center justify-center gap-2">
+          <span>Viewing shared tracker: <strong className="text-amber-950 dark:text-amber-200 font-bold">{sharedTrackerInfo.name}</strong> <span className="font-normal opacity-75">by {sharedTrackerInfo.ownerName}</span></span>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={async () => {
+                setIsLoading(true);
+                try {
+                  const [fRes, eRes] = await Promise.all([
+                    fetch("/api/friends",  { headers: { "Authorization": `Bearer ${token}`, "x-tracker-id": trackerId! } }),
+                    fetch("/api/expenses", { headers: { "Authorization": `Bearer ${token}`, "x-tracker-id": trackerId! } }),
+                  ]);
+                  if (fRes.ok) setFriends(await fRes.json());
+                  if (eRes.ok) setExpenses(await eRes.json());
+                } finally { setIsLoading(false); }
+              }}
+              className="bg-white dark:bg-amber-900/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-amber-700/40 px-2 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wide cursor-pointer transition-colors flex items-center gap-1"
+            >
+              <RefreshCw className="w-2.5 h-2.5" /> Refresh
+            </button>
+            <button
+              onClick={handleSwitchToDefault}
+              className="bg-white dark:bg-stone-800 hover:bg-amber-100 dark:hover:bg-stone-700 text-amber-900 dark:text-amber-300 border border-amber-200/80 dark:border-stone-700 px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wide cursor-pointer transition-colors"
+            >
+              Back to Mine
+            </button>
+          </div>
         </div>
       )}
 
