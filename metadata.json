@@ -1,1 +1,8 @@
-{"name":"Meal Expense Tracker","description":"Track group meal expenses, see who pays next, scan receipt images, and estimate calories of dishes using Gemini AI.","requestFramePermissions":[],"majorCapabilities":["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]}
+{
+    "name": "Meals Tracker",
+    "description": "Track group meal expenses, see who pays next, scan receipt images, and estimate calories of dishes using Gemini AI.",
+    "requestFramePermissions": [],
+    "majorCapabilities": [
+        "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+    ]
+}
