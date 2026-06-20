@@ -55,6 +55,7 @@ export default function App() {
   const [isAddingExpense, setIsAddingExpense] = useState(false);
   const [preselectedFormPayer, setPreselectedFormPayer] = useState<Friend | undefined>(undefined);
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Timeframe filtering states and derivations
   const [filterType, setFilterType] = useState<"all" | "year" | "month">("all");
@@ -86,70 +87,96 @@ export default function App() {
     return true;
   });
 
-  // Load from local storage
+  // Fetch initial data from SQLite backend on mount
   useEffect(() => {
-    const savedFriends = localStorage.getItem("meal_friends");
-    const savedExpenses = localStorage.getItem("meal_expenses");
+    const fetchData = async () => {
+      try {
+        const friendsRes = await fetch("/api/friends");
+        const friendsData = await friendsRes.json();
+        setFriends(friendsData);
 
-    if (savedFriends) {
-      setFriends(JSON.parse(savedFriends));
-    } else {
-      // Seed initial friends
-      setFriends(SEED_FRIENDS);
-      localStorage.setItem("meal_friends", JSON.stringify(SEED_FRIENDS));
-    }
-
-    if (savedExpenses) {
-      setExpenses(JSON.parse(savedExpenses));
-    } else {
-      // Seed initial expenses
-      setExpenses(SEED_EXPENSES);
-      localStorage.setItem("meal_expenses", JSON.stringify(SEED_EXPENSES));
-    }
+        const expensesRes = await fetch("/api/expenses");
+        const expensesData = await expensesRes.json();
+        setExpenses(expensesData);
+      } catch (err) {
+        console.error("Failed to load initial data from database:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
   }, []);
 
-  // Save to local storage helpers
-  const saveFriends = (updated: Friend[]) => {
-    setFriends(updated);
-    localStorage.setItem("meal_friends", JSON.stringify(updated));
-  };
-
-  const saveExpenses = (updated: Expense[]) => {
-    setExpenses(updated);
-    localStorage.setItem("meal_expenses", JSON.stringify(updated));
-  };
-
-  // State manipulation handlers
-  const handleAddFriend = (name: string, color: string) => {
+  // State manipulation handlers communicating with the SQLite API
+  const handleAddFriend = async (name: string, color: string) => {
     const newFriend: Friend = {
       id: crypto.randomUUID(),
       name,
       color,
     };
-    saveFriends([...friends, newFriend]);
+    try {
+      const response = await fetch("/api/friends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newFriend),
+      });
+      if (!response.ok) throw new Error("Failed to save friend to database");
+      setFriends([...friends, newFriend]);
+    } catch (err) {
+      console.error("Failed to add friend:", err);
+      alert("Error adding friend. Please check connection.");
+    }
   };
 
-  const handleDeleteFriend = (id: string) => {
-    const updated = friends.filter((f) => f.id !== id);
-    saveFriends(updated);
+  const handleDeleteFriend = async (id: string) => {
+    try {
+      const response = await fetch(`/api/friends/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete friend from database");
+      setFriends(friends.filter((f) => f.id !== id));
+    } catch (err) {
+      console.error("Failed to delete friend:", err);
+      alert("Error deleting friend.");
+    }
   };
 
-  const handleAddExpense = (expenseData: Omit<Expense, "id">) => {
+  const handleAddExpense = async (expenseData: Omit<Expense, "id">) => {
     const newExpense: Expense = {
       ...expenseData,
       id: crypto.randomUUID(),
     };
-    const updated = [newExpense, ...expenses];
-    saveExpenses(updated);
-    setIsAddingExpense(false);
-    setPreselectedFormPayer(undefined);
+    try {
+      const response = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newExpense),
+      });
+      if (!response.ok) throw new Error("Failed to save expense to database");
+      setExpenses([newExpense, ...expenses]);
+      setIsAddingExpense(false);
+      setPreselectedFormPayer(undefined);
+    } catch (err) {
+      console.error("Failed to add expense:", err);
+      alert("Error saving expense.");
+    }
   };
 
-  const handleUpdateExpense = (updatedExpense: Expense) => {
-    const updated = expenses.map((e) => (e.id === updatedExpense.id ? updatedExpense : e));
-    saveExpenses(updated);
-    setIsAddingExpense(false);
-    setEditingExpense(undefined);
+  const handleUpdateExpense = async (updatedExpense: Expense) => {
+    try {
+      const response = await fetch(`/api/expenses/${updatedExpense.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedExpense),
+      });
+      if (!response.ok) throw new Error("Failed to update expense in database");
+      setExpenses(expenses.map((e) => (e.id === updatedExpense.id ? updatedExpense : e)));
+      setIsAddingExpense(false);
+      setEditingExpense(undefined);
+    } catch (err) {
+      console.error("Failed to update expense:", err);
+      alert("Error updating expense.");
+    }
   };
 
   const handleEditExpense = (expense: Expense) => {
@@ -157,9 +184,17 @@ export default function App() {
     setIsAddingExpense(true);
   };
 
-  const handleDeleteExpense = (id: string) => {
-    const updated = expenses.filter((e) => e.id !== id);
-    saveExpenses(updated);
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      const response = await fetch(`/api/expenses/${id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete expense from database");
+      setExpenses(expenses.filter((e) => e.id !== id));
+    } catch (err) {
+      console.error("Failed to delete expense:", err);
+      alert("Error deleting expense.");
+    }
   };
 
   // Quick action from recommendation hero
@@ -169,21 +204,37 @@ export default function App() {
   };
 
   // Erase all custom states to start fully fresh
-  const handleResetData = () => {
+  const handleResetData = async () => {
     if (confirm("Reset application? All logged expenses and friend lists will be cleared.")) {
-      setFriends([]);
-      setExpenses([]);
-      localStorage.removeItem("meal_friends");
-      localStorage.removeItem("meal_expenses");
+      try {
+        const response = await fetch("/api/db/reset", { method: "POST" });
+        if (!response.ok) throw new Error("Failed to reset database");
+        setFriends([]);
+        setExpenses([]);
+      } catch (err) {
+        console.error("Failed to reset database:", err);
+        alert("Error resetting database.");
+      }
     }
   };
 
   // Restore Seed Templates
-  const handleRestoreSamples = () => {
-    setFriends(SEED_FRIENDS);
-    setExpenses(SEED_EXPENSES);
-    localStorage.setItem("meal_friends", JSON.stringify(SEED_FRIENDS));
-    localStorage.setItem("meal_expenses", JSON.stringify(SEED_EXPENSES));
+  const handleRestoreSamples = async () => {
+    try {
+      const response = await fetch("/api/db/restore", { method: "POST" });
+      if (!response.ok) throw new Error("Failed to restore seed templates");
+      
+      const friendsRes = await fetch("/api/friends");
+      const friendsData = await friendsRes.json();
+      setFriends(friendsData);
+
+      const expensesRes = await fetch("/api/expenses");
+      const expensesData = await expensesRes.json();
+      setExpenses(expensesData);
+    } catch (err) {
+      console.error("Failed to restore samples:", err);
+      alert("Error restoring samples.");
+    }
   };
 
   return (
@@ -257,7 +308,13 @@ export default function App() {
       {/* Main Container Stage */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8 sm:px-6">
 
-        <AnimatePresence mode="wait">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 space-y-4" id="app-loading-state">
+            <RefreshCw className="w-8 h-8 animate-spin text-amber-500" />
+            <p className="text-sm font-semibold text-stone-500">Loading ledger data...</p>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
           {isAddingExpense ? (
             <motion.div
               key="expense-form-wrapper"
@@ -387,6 +444,7 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
 
       </main>
 
