@@ -12,7 +12,7 @@ WORKDIR /app
 # Install sqlite3 compilation dependencies if needed (slim image might need python/make/g++, but npm prebuild binaries usually cover standard Node platforms)
 RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --only=production --build-from-source
 COPY --from=builder /app/dist ./dist
 # Copy db.ts and server.ts since they are compiled into dist/server.cjs, wait! 
 # In our scripts: "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs"

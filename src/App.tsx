@@ -457,24 +457,7 @@ export default function App() {
     }
   };
 
-  // Restore Seed Templates
-  const handleRestoreSamples = async () => {
-    try {
-      const response = await apiFetch("/api/db/restore", { method: "POST" });
-      if (!response.ok) throw new Error("Failed to restore seed templates");
-      
-      const friendsRes = await apiFetch("/api/friends");
-      const friendsData = await friendsRes.json();
-      setFriends(friendsData);
 
-      const expensesRes = await apiFetch("/api/expenses");
-      const expensesData = await expensesRes.json();
-      setExpenses(expensesData);
-    } catch (err) {
-      console.error("Failed to restore samples:", err);
-      alert("Error restoring samples.");
-    }
-  };
 
   // Whenever token is cleared or showMockLogin changes, try to render the Google button
   useEffect(() => {
@@ -864,13 +847,6 @@ export default function App() {
           </div>
 
           <div className="flex flex-wrap gap-4 items-center justify-center font-semibold">
-            <button
-              onClick={handleRestoreSamples}
-              className="text-stone-600 hover:text-stone-800 transition-colors flex items-center gap-1 cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Restore Sample Group
-            </button>
-            <span className="text-stone-300">|</span>
             <button
               onClick={handleResetData}
               className="text-rose-600 hover:text-rose-800 transition-colors cursor-pointer"

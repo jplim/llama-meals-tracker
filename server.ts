@@ -411,55 +411,6 @@ app.post("/api/db/reset", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/db/restore", authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user!.id;
-    const trackerId = (req.headers["x-tracker-id"] as string) || `${userId}-default`;
-    const db = await getDb();
-    
-    await ensureTracker(db, trackerId, userId, req.user!.name);
-
-    await db.run("BEGIN TRANSACTION");
-    try {
-      await db.run("DELETE FROM friends WHERE trackerId = ?", [trackerId]);
-      await db.run("DELETE FROM expenses WHERE trackerId = ?", [trackerId]);
-      
-      for (const f of SEED_FRIENDS) {
-        await db.run(
-          "INSERT INTO friends (id, trackerId, name, color) VALUES (?, ?, ?, ?)",
-          [f.id, trackerId, f.name, f.color]
-        );
-      }
-      
-      for (const e of getSeedExpenses()) {
-        await db.run(
-          "INSERT INTO expenses (id, trackerId, title, date, paidById, amount, estimatedCalories, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-          [e.id, trackerId, e.title, e.date, e.paidById, e.amount, e.estimatedCalories, e.notes]
-        );
-        
-        for (const pId of e.participants) {
-          await db.run("INSERT INTO expense_participants (expenseId, friendId) VALUES (?, ?)", [e.id, pId]);
-        }
-        
-        for (const item of e.items) {
-          await db.run(
-            "INSERT INTO expense_items (id, expenseId, name, price, estimatedCalories) VALUES (?, ?, ?, ?, ?)",
-            [item.id, e.id, item.name, item.price, item.estimatedCalories]
-          );
-        }
-      }
-      
-      await db.run("COMMIT");
-      res.json({ success: true });
-    } catch (err) {
-      await db.run("ROLLBACK");
-      throw err;
-    }
-  } catch (err: any) {
-    console.error("POST /api/db/restore error:", err);
-    res.status(500).json({ error: err.message || "Failed to restore database samples" });
-  }
-});
 
 // Authentication Routes
 
