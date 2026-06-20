@@ -58,6 +58,14 @@ export async function getDb(): Promise<Database> {
         FOREIGN KEY (ownerId) REFERENCES users(id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS tracker_shares (
+        trackerId TEXT NOT NULL,
+        userId TEXT NOT NULL,
+        PRIMARY KEY (trackerId, userId),
+        FOREIGN KEY (trackerId) REFERENCES trackers(id) ON DELETE CASCADE,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      );
+
       CREATE TABLE IF NOT EXISTS friends (
         id TEXT PRIMARY KEY,
         trackerId TEXT NOT NULL,

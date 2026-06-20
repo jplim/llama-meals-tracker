@@ -36,3 +36,12 @@ export interface ReceiptScanResult {
   estimatedCalories: number;
   suggestedParticipants?: string[];
 }
+
+export interface TrackerInfo {
+  id: string;
+  name: string;
+  ownerId: string;
+  ownerName: string;
+  isOwner: number; // 1 = owner, 0 = shared with me
+}
+

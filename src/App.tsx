@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { Friend, Expense } from "./types";
+import React, { useState, useEffect, useRef } from "react";
+import { Friend, Expense, TrackerInfo } from "./types";
 import FriendManager from "./components/FriendManager";
 import ExpenseForm from "./components/ExpenseForm";
 import ExpenseList from "./components/ExpenseList";
 import DashboardStats from "./components/DashboardStats";
-import { Plus, Users, UtensilsCrossed, Sparkles, BookOpen, Smile, RefreshCw, Layers, Filter, Sun, Moon, Monitor, LogOut } from "lucide-react";
+import { Plus, UtensilsCrossed, Sparkles, Smile, RefreshCw, Filter, Sun, Moon, Monitor, LogOut, Share2, Trash2, Check, Link, Mail, FolderOpen, PlusCircle, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 // Beautiful custom initial seed data
@@ -70,6 +70,19 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
+  // Multi-tracker state
+  const [trackers, setTrackers] = useState<TrackerInfo[]>([]);
+  const [isCreatingTracker, setIsCreatingTracker] = useState(false);
+  const [newTrackerName, setNewTrackerName] = useState("");
+  const [trackerCreateLoading, setTrackerCreateLoading] = useState(false);
+  const [shareModalTracker, setShareModalTracker] = useState<TrackerInfo | null>(null);
+  const [shareMode, setShareMode] = useState<"email" | "link">("link");
+  const [shareEmail, setShareEmail] = useState("");
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareResult, setShareResult] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [deletingTrackerId, setDeletingTrackerId] = useState<string | null>(null);
+  const newTrackerInputRef = useRef<HTMLInputElement>(null);
+
   // Close profile dropdown when clicking outside
   useEffect(() => {
     if (!isProfileMenuOpen) return;
@@ -82,6 +95,13 @@ export default function App() {
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [isProfileMenuOpen]);
+
+  // Focus new tracker input when form appears
+  useEffect(() => {
+    if (isCreatingTracker && newTrackerInputRef.current) {
+      newTrackerInputRef.current.focus();
+    }
+  }, [isCreatingTracker]);
 
   const [friends, setFriends] = useState<Friend[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -166,6 +186,131 @@ export default function App() {
     setDefaultTrackerId(null);
     setTrackerId(null);
     setSharedTrackerInfo(null);
+    setTrackers([]);
+  };
+
+  // Fetch all trackers accessible to the user
+  const fetchTrackers = async (currentToken: string) => {
+    try {
+      const res = await fetch("/api/trackers", {
+        headers: { "Authorization": `Bearer ${currentToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTrackers(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch trackers:", err);
+    }
+  };
+
+  // Create a new tracker
+  const handleCreateTracker = async () => {
+    const name = newTrackerName.trim();
+    if (!name || !token) return;
+    setTrackerCreateLoading(true);
+    try {
+      const res = await fetch("/api/trackers", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to create tracker");
+      }
+      const newTracker: TrackerInfo = await res.json();
+      setTrackers(prev => [...prev, newTracker]);
+      setNewTrackerName("");
+      setIsCreatingTracker(false);
+      // Switch to the newly created tracker
+      handleSwitchTracker(newTracker);
+      setToast(`Tracker "${newTracker.name}" created!`);
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: any) {
+      alert(err.message || "Error creating tracker.");
+    } finally {
+      setTrackerCreateLoading(false);
+    }
+  };
+
+  // Delete a tracker (owner only)
+  const handleDeleteTracker = async (tracker: TrackerInfo) => {
+    if (!confirm(`Delete tracker "${tracker.name}"? This will permanently remove all its meals, friends, and data.`)) return;
+    setDeletingTrackerId(tracker.id);
+    try {
+      const res = await fetch(`/api/trackers/${tracker.id}`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to delete tracker");
+      }
+      setTrackers(prev => prev.filter(t => t.id !== tracker.id));
+      // If we were on this tracker, switch back to default
+      if (trackerId === tracker.id && defaultTrackerId) {
+        handleSwitchTracker({ id: defaultTrackerId, name: "My Tracker", ownerId: user?.id || "", ownerName: user?.name || "", isOwner: 1 });
+      }
+      setToast(`Tracker "${tracker.name}" deleted.`);
+      setTimeout(() => setToast(null), 3000);
+    } catch (err: any) {
+      alert(err.message || "Error deleting tracker.");
+    } finally {
+      setDeletingTrackerId(null);
+    }
+  };
+
+  // Switch active tracker
+  const handleSwitchTracker = (tracker: TrackerInfo) => {
+    const url = new URL(window.location.href);
+    if (tracker.id === defaultTrackerId) {
+      url.searchParams.delete("tracker");
+      setSharedTrackerInfo(null);
+    } else {
+      url.searchParams.set("tracker", tracker.id);
+      if (tracker.isOwner === 0) {
+        setSharedTrackerInfo({ id: tracker.id, name: tracker.name, ownerName: tracker.ownerName });
+      } else {
+        setSharedTrackerInfo(null);
+      }
+    }
+    window.history.pushState({}, "", url.toString());
+    setTrackerId(tracker.id);
+    setIsProfileMenuOpen(false);
+    setFriends([]);
+    setExpenses([]);
+  };
+
+  // Share tracker by email
+  const handleShareByEmail = async () => {
+    if (!shareModalTracker || !shareEmail.trim() || !token) return;
+    setShareLoading(true);
+    setShareResult(null);
+    try {
+      const res = await fetch(`/api/trackers/${shareModalTracker.id}/share`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: shareEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to share");
+      setShareResult({ ok: true, msg: data.message || "Tracker shared successfully!" });
+      setShareEmail("");
+    } catch (err: any) {
+      setShareResult({ ok: false, msg: err.message || "Error sharing tracker." });
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  // Copy share link to clipboard
+  const handleCopyShareLink = (tid: string) => {
+    const shareUrl = `${window.location.origin}/?tracker=${tid}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setToast("Tracker share link copied!");
+      setTimeout(() => setToast(null), 3000);
+    });
   };
 
   // API Fetch Helper wrapping Authorization and Tracker ID headers
@@ -309,6 +454,11 @@ export default function App() {
     };
     fetchData();
   }, [token, trackerId]);
+
+  // Fetch trackers whenever token is available
+  useEffect(() => {
+    if (token) fetchTrackers(token);
+  }, [token]);
 
   const handleGoogleSignInResponse = async (response: any) => {
     setIsLoading(true);
@@ -640,10 +790,112 @@ export default function App() {
     );
   }
 
+  // Active tracker display name
+  const activeTrackerName = trackers.find(t => t.id === trackerId)?.name
+    ?? (trackerId === defaultTrackerId ? "My Tracker" : null);
+
   return (
     <div className="min-h-screen pb-16 flex flex-col pt-1 bg-stone-50 dark:bg-stone-950 transition-colors" id="applet-viewport">
 
-      {/* Top ambient notification of local timezone and details */}
+      {/* Share modal overlay */}
+      <AnimatePresence>
+        {shareModalTracker && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+            onClick={(e) => { if (e.target === e.currentTarget) { setShareModalTracker(null); setShareResult(null); setShareEmail(""); } }}
+          >
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+            <motion.div
+              initial={{ scale: 0.95, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 12 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="relative bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl shadow-2xl p-6 w-full max-w-sm z-10"
+            >
+              <button
+                onClick={() => { setShareModalTracker(null); setShareResult(null); setShareEmail(""); }}
+                className="absolute top-4 right-4 text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 bg-amber-500/10 dark:bg-amber-500/15 rounded-xl flex items-center justify-center">
+                  <Share2 className="w-4.5 h-4.5 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-stone-900 dark:text-stone-100">Share Tracker</p>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate max-w-[180px]">{shareModalTracker.name}</p>
+                </div>
+              </div>
+
+              {/* Mode toggle */}
+              <div className="bg-stone-100 dark:bg-stone-800 p-0.5 rounded-xl flex gap-0.5 mb-4 text-xs font-semibold border border-stone-200/40 dark:border-stone-700/40">
+                <button
+                  onClick={() => { setShareMode("link"); setShareResult(null); }}
+                  className={`flex-1 py-1.5 rounded-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    shareMode === "link" ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs" : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
+                  }`}
+                >
+                  <Link className="w-3 h-3" /> Copy Link
+                </button>
+                <button
+                  onClick={() => { setShareMode("email"); setShareResult(null); }}
+                  className={`flex-1 py-1.5 rounded-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    shareMode === "email" ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs" : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
+                  }`}
+                >
+                  <Mail className="w-3 h-3" /> By Email
+                </button>
+              </div>
+
+              {shareMode === "link" ? (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400">Anyone with this link can view and contribute to this tracker.</p>
+                  <div className="flex items-center gap-2 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2">
+                    <span className="text-[10px] text-stone-500 dark:text-stone-400 flex-1 truncate font-mono">{window.location.origin}/?tracker={shareModalTracker.id}</span>
+                  </div>
+                  <button
+                    onClick={() => handleCopyShareLink(shareModalTracker.id)}
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold py-2.5 px-4 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-amber-500/10 flex items-center justify-center gap-1.5"
+                  >
+                    <Link className="w-3.5 h-3.5" /> Copy Share Link
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400">Share directly with a user who has already signed in to Meals Tracker.</p>
+                  <input
+                    type="email"
+                    placeholder="friend@example.com"
+                    value={shareEmail}
+                    onChange={(e) => { setShareEmail(e.target.value); setShareResult(null); }}
+                    onKeyDown={(e) => e.key === "Enter" && handleShareByEmail()}
+                    className="w-full bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2.5 outline-none focus:border-amber-400 dark:focus:border-amber-500 text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 transition-colors"
+                  />
+                  {shareResult && (
+                    <p className={`text-[11px] font-semibold px-1 ${ shareResult.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400" }`}>
+                      {shareResult.msg}
+                    </p>
+                  )}
+                  <button
+                    onClick={handleShareByEmail}
+                    disabled={shareLoading || !shareEmail.trim()}
+                    className="w-full bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-stone-950 font-bold py-2.5 px-4 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-amber-500/10 flex items-center justify-center gap-1.5"
+                  >
+                    {shareLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                    {shareLoading ? "Sharing..." : "Share via Email"}
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
       <header className="border-b border-stone-250/60 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs sticky top-0 z-50 transition-colors">
         <div className="max-w-5xl mx-auto px-4 py-3 sm:py-4 sm:px-6 flex flex-wrap items-center justify-between gap-y-3 gap-x-2">
           {/* Logo & branding */}
@@ -658,7 +910,12 @@ export default function App() {
                   AI
                 </span>
               </h1>
-              <p className="text-[10px] sm:text-[11px] text-stone-500 dark:text-stone-400 hidden sm:block">Group Dining Split & Caloric Ledger</p>
+              {activeTrackerName && (
+                <p className="text-[10px] sm:text-[11px] text-amber-600 dark:text-amber-400 font-semibold flex items-center gap-1">
+                  <FolderOpen className="w-3 h-3" />
+                  {activeTrackerName}
+                </p>
+              )}
             </div>
           </div>
 
@@ -708,9 +965,10 @@ export default function App() {
             )}
           </div>
 
+          {/* Profile + tracker dropdown */}
           <div id="profile-dropdown-container" className="relative flex items-center order-2 sm:order-3">
             <button
-              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              onClick={() => { setIsProfileMenuOpen(!isProfileMenuOpen); setIsCreatingTracker(false); }}
               className="focus:outline-hidden rounded-full transition-all duration-200 active:scale-95 flex items-center justify-center p-1.5 hover:bg-stone-100 dark:hover:bg-stone-800/60"
               aria-label="Toggle profile menu"
             >
@@ -728,39 +986,155 @@ export default function App() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 8, scale: 0.95 }}
                   transition={{ duration: 0.15, ease: "easeOut" }}
-                  className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-stone-250/60 dark:border-stone-800 bg-white/95 dark:bg-stone-900/95 backdrop-blur-md shadow-xl p-4 z-50 text-left flex flex-col gap-3.5"
+                  className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-stone-250/60 dark:border-stone-800 bg-white/95 dark:bg-stone-900/95 backdrop-blur-md shadow-xl z-50 text-left overflow-hidden"
                 >
-                  <div className="px-1 py-0.5">
-                    <p className="text-xs font-bold text-stone-900 dark:text-stone-100">{user.name}</p>
-                    <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">{user.email}</p>
+                  {/* User info */}
+                  <div className="px-4 pt-4 pb-3 flex items-center gap-3">
+                    <img
+                      src={user.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`}
+                      alt={user.name}
+                      className="w-9 h-9 rounded-full border border-stone-200 dark:border-stone-700/80 object-cover shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-stone-900 dark:text-stone-100 truncate">{user.name}</p>
+                      <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">{user.email}</p>
+                    </div>
                   </div>
 
-                  <div className="h-px bg-stone-150 dark:bg-stone-800" />
+                  <div className="h-px bg-stone-150 dark:bg-stone-800 mx-1" />
 
-                  {/* Actions */}
-                  <button
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      handleShareTracker();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/20 active:bg-amber-100/60 transition-colors text-left cursor-pointer border border-transparent"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Share Tracker</span>
-                  </button>
+                  {/* Trackers section */}
+                  <div className="px-3 pt-3 pb-2">
+                    <p className="text-[10px] font-extrabold text-stone-400 dark:text-stone-500 uppercase tracking-wider px-1 mb-2">My Trackers</p>
+                    <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                      {trackers.length === 0 && (
+                        <p className="text-[11px] text-stone-400 dark:text-stone-500 px-1 py-1">No trackers yet.</p>
+                      )}
+                      {trackers.map(t => {
+                        const isActive = t.id === trackerId;
+                        const isOwned = t.isOwner === 1;
+                        const isDefaultTracker = t.id === defaultTrackerId;
+                        const isDeleting = deletingTrackerId === t.id;
+                        return (
+                          <div
+                            key={t.id}
+                            className={`group flex items-center gap-2 rounded-xl px-2 py-1.5 transition-colors ${
+                              isActive
+                                ? "bg-amber-50 dark:bg-amber-950/25 border border-amber-200/60 dark:border-amber-800/30"
+                                : "hover:bg-stone-100 dark:hover:bg-stone-800/60 border border-transparent"
+                            }`}
+                          >
+                            <button
+                              onClick={() => !isActive && handleSwitchTracker(t)}
+                              className="flex-1 flex items-center gap-2 min-w-0 text-left cursor-pointer"
+                              disabled={isActive}
+                            >
+                              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                                isActive ? "bg-amber-500 text-white" : "bg-stone-100 dark:bg-stone-800 text-stone-500"
+                              }`}>
+                                {isActive ? <Check className="w-3 h-3" /> : <FolderOpen className="w-3 h-3" />}
+                              </div>
+                              <div className="min-w-0">
+                                <p className={`text-[11px] font-semibold truncate ${
+                                  isActive ? "text-amber-800 dark:text-amber-300" : "text-stone-800 dark:text-stone-200"
+                                }`}>{t.name}</p>
+                                {!isOwned && (
+                                  <p className="text-[9px] text-stone-400 dark:text-stone-500 truncate">by {t.ownerName}</p>
+                                )}
+                                {isOwned && isDefaultTracker && (
+                                  <p className="text-[9px] text-stone-400 dark:text-stone-500">Default</p>
+                                )}
+                              </div>
+                            </button>
 
-                  <div className="h-px bg-stone-150 dark:bg-stone-800" />
+                            {/* Share & delete controls — visible on hover */}
+                            <div className={`flex items-center gap-0.5 transition-opacity ${ isDeleting ? "opacity-100" : "opacity-0 group-hover:opacity-100" }`}>
+                              {isOwned && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setShareModalTracker(t); setShareMode("link"); setShareResult(null); setIsProfileMenuOpen(false); }}
+                                  title="Share tracker"
+                                  className="p-1 rounded-lg text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-colors cursor-pointer"
+                                >
+                                  <Share2 className="w-3 h-3" />
+                                </button>
+                              )}
+                              {isOwned && !isDefaultTracker && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteTracker(t); }}
+                                  title="Delete tracker"
+                                  disabled={isDeleting}
+                                  className="p-1 rounded-lg text-stone-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                  {isDeleting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Create new tracker */}
+                    <AnimatePresence>
+                      {isCreatingTracker ? (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.15 }}
+                          className="mt-2 overflow-hidden"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              ref={newTrackerInputRef}
+                              type="text"
+                              placeholder="Tracker name..."
+                              value={newTrackerName}
+                              onChange={(e) => setNewTrackerName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleCreateTracker();
+                                if (e.key === "Escape") { setIsCreatingTracker(false); setNewTrackerName(""); }
+                              }}
+                              className="flex-1 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl px-2.5 py-1.5 text-[11px] text-stone-900 dark:text-stone-100 placeholder:text-stone-400 outline-none focus:border-amber-400 dark:focus:border-amber-500 transition-colors"
+                            />
+                            <button
+                              onClick={handleCreateTracker}
+                              disabled={trackerCreateLoading || !newTrackerName.trim()}
+                              className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-stone-950 font-bold py-1.5 px-2.5 rounded-xl text-[11px] transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                            >
+                              {trackerCreateLoading ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                            </button>
+                            <button
+                              onClick={() => { setIsCreatingTracker(false); setNewTrackerName(""); }}
+                              className="p-1.5 rounded-xl text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <button
+                          onClick={() => setIsCreatingTracker(true)}
+                          className="mt-1.5 w-full flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-[11px] font-semibold text-stone-500 dark:text-stone-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/15 transition-colors cursor-pointer"
+                        >
+                          <PlusCircle className="w-3.5 h-3.5" />
+                          New Tracker
+                        </button>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div className="h-px bg-stone-150 dark:bg-stone-800 mx-1" />
 
                   {/* Theme switcher */}
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-[10px] text-stone-400 dark:text-stone-500 font-extrabold uppercase tracking-wider px-1">Appearance</span>
-                    <div className="bg-stone-100 dark:bg-stone-800 p-1 rounded-xl flex items-center gap-1 font-semibold text-xs border border-stone-200/40 dark:border-stone-700/40">
+                  <div className="px-3 pt-3 pb-2">
+                    <span className="text-[10px] text-stone-400 dark:text-stone-500 font-extrabold uppercase tracking-wider px-1 block mb-2">Appearance</span>
+                    <div className="bg-stone-100 dark:bg-stone-800 p-0.5 rounded-xl flex items-center gap-0.5 font-semibold text-xs border border-stone-200/40 dark:border-stone-700/40">
                       <button
                         onClick={() => setTheme("light")}
-                        className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex justify-center items-center gap-1.5 ${theme === "light"
-                            ? "bg-white dark:bg-stone-900 text-amber-500 shadow-xs"
-                            : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
-                          }`}
+                        className={`flex-1 py-1.5 rounded-[10px] transition-all cursor-pointer flex justify-center items-center gap-1.5 ${
+                          theme === "light" ? "bg-white dark:bg-stone-900 text-amber-500 shadow-xs" : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                        }`}
                         title="Light Mode"
                       >
                         <Sun className="w-3.5 h-3.5" />
@@ -768,10 +1142,9 @@ export default function App() {
                       </button>
                       <button
                         onClick={() => setTheme("dark")}
-                        className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex justify-center items-center gap-1.5 ${theme === "dark"
-                            ? "bg-white dark:bg-stone-900 text-indigo-400 shadow-xs"
-                            : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
-                          }`}
+                        className={`flex-1 py-1.5 rounded-[10px] transition-all cursor-pointer flex justify-center items-center gap-1.5 ${
+                          theme === "dark" ? "bg-white dark:bg-stone-900 text-indigo-400 shadow-xs" : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                        }`}
                         title="Dark Mode"
                       >
                         <Moon className="w-3.5 h-3.5" />
@@ -779,10 +1152,9 @@ export default function App() {
                       </button>
                       <button
                         onClick={() => setTheme("system")}
-                        className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex justify-center items-center gap-1.5 ${theme === "system"
-                            ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs"
-                            : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
-                          }`}
+                        className={`flex-1 py-1.5 rounded-[10px] transition-all cursor-pointer flex justify-center items-center gap-1.5 ${
+                          theme === "system" ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs" : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                        }`}
                         title="System Mode"
                       >
                         <Monitor className="w-3.5 h-3.5" />
@@ -791,19 +1163,21 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="h-px bg-stone-150 dark:bg-stone-800" />
+                  <div className="h-px bg-stone-150 dark:bg-stone-800 mx-1" />
 
                   {/* Logout Button */}
-                  <button
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      handleLogout();
-                    }}
-                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 active:bg-red-100 transition-colors text-left cursor-pointer"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Logout</span>
-                  </button>
+                  <div className="px-3 pt-2 pb-3">
+                    <button
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 active:bg-red-100 transition-colors text-left cursor-pointer"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Logout</span>
+                    </button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import { getDb } from "./db";
 import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
+import crypto from "crypto";
 
 dotenv.config();
 
@@ -49,58 +50,63 @@ function authenticateToken(req: express.Request, res: express.Response, next: ex
   });
 }
 
-// Seed data constants
-const SEED_FRIENDS = [
-  { id: "1", name: "Alice Miller", color: "#F97316" }, // Orange
-  { id: "2", name: "Bob Harris", color: "#10B981" },   // Basil Green
-  { id: "3", name: "Charlotte Du", color: "#8B5CF6" }, // Grape Violet
-];
-
-const getSeedExpenses = () => [
-  {
-    id: "e1",
-    title: "Artisanal Ramen Lunch",
-    date: new Date(Date.now() - 48 * 3600000).toISOString().split("T")[0],
-    paidById: "1", // Alice paid
-    amount: 54.50,
-    participants: ["1", "2", "3"], // All three shared
-    items: [
-      { id: "item1", name: "Tonkotsu Ramen", price: 16.50, estimatedCalories: 850 },
-      { id: "item2", name: "Shoyu Ramen", price: 15.50, estimatedCalories: 720 },
-      { id: "item3", name: "Spicy Miso Ramen", price: 17.50, estimatedCalories: 950 },
-      { id: "item4", name: "Green Tea ice cream", price: 5.00, estimatedCalories: 240 }
-    ],
-    estimatedCalories: 2760,
-    notes: "Delicious noodles! Alice covered for everyone."
-  },
-  {
-    id: "e2",
-    title: "Morning Bistro Espresso",
-    date: new Date(Date.now() - 24 * 3600000).toISOString().split("T")[0],
-    paidById: "2", // Bob paid
-    amount: 18.25,
-    participants: ["1", "2"], // Alice and Bob
-    items: [
-      { id: "item5", name: "Flat White Coffee", price: 4.75, estimatedCalories: 120 },
-      { id: "item6", name: "Capuccino", price: 4.50, estimatedCalories: 140 },
-      { id: "item7", name: "Almond Croissants (x2)", price: 9.00, estimatedCalories: 720 }
-    ],
-    estimatedCalories: 980,
-    notes: "Quick coffee sync. Charlotte wasn't there."
-  }
-];
 
 async function seedTracker(db: any, trackerId: string) {
   const friendsCount = await db.get("SELECT COUNT(*) as count FROM friends WHERE trackerId = ?", [trackerId]);
   const expensesCount = await db.get("SELECT COUNT(*) as count FROM expenses WHERE trackerId = ?", [trackerId]);
   if (friendsCount.count === 0 && expensesCount.count === 0) {
-    for (const f of SEED_FRIENDS) {
+    // Generate unique IDs per seeding call to avoid PRIMARY KEY collisions across trackers
+    const f1 = crypto.randomUUID();
+    const f2 = crypto.randomUUID();
+    const f3 = crypto.randomUUID();
+
+    const seedFriends = [
+      { id: f1, name: "Alice Miller", color: "#F97316" },
+      { id: f2, name: "Bob Harris",   color: "#10B981" },
+      { id: f3, name: "Charlotte Du", color: "#8B5CF6" },
+    ];
+
+    const seedExpenses = [
+      {
+        id: crypto.randomUUID(),
+        title: "Artisanal Ramen Lunch",
+        date: new Date(Date.now() - 48 * 3600000).toISOString().split("T")[0],
+        paidById: f1,
+        amount: 54.50,
+        participants: [f1, f2, f3],
+        estimatedCalories: 2760,
+        notes: "Delicious noodles! Alice covered for everyone.",
+        items: [
+          { id: crypto.randomUUID(), name: "Tonkotsu Ramen",           price: 16.50, estimatedCalories: 850 },
+          { id: crypto.randomUUID(), name: "Shoyu Ramen",              price: 15.50, estimatedCalories: 720 },
+          { id: crypto.randomUUID(), name: "Spicy Miso Ramen",         price: 17.50, estimatedCalories: 950 },
+          { id: crypto.randomUUID(), name: "Green Tea ice cream",      price:  5.00, estimatedCalories: 240 },
+        ],
+      },
+      {
+        id: crypto.randomUUID(),
+        title: "Morning Bistro Espresso",
+        date: new Date(Date.now() - 24 * 3600000).toISOString().split("T")[0],
+        paidById: f2,
+        amount: 18.25,
+        participants: [f1, f2],
+        estimatedCalories: 980,
+        notes: "Quick coffee sync. Charlotte wasn't there.",
+        items: [
+          { id: crypto.randomUUID(), name: "Flat White Coffee",        price:  4.75, estimatedCalories: 120 },
+          { id: crypto.randomUUID(), name: "Capuccino",                price:  4.50, estimatedCalories: 140 },
+          { id: crypto.randomUUID(), name: "Almond Croissants (x2)",   price:  9.00, estimatedCalories: 720 },
+        ],
+      },
+    ];
+
+    for (const f of seedFriends) {
       await db.run(
         "INSERT INTO friends (id, trackerId, name, color) VALUES (?, ?, ?, ?)",
         [f.id, trackerId, f.name, f.color]
       );
     }
-    for (const e of getSeedExpenses()) {
+    for (const e of seedExpenses) {
       await db.run(
         "INSERT INTO expenses (id, trackerId, title, date, paidById, amount, estimatedCalories, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [e.id, trackerId, e.title, e.date, e.paidById, e.amount, e.estimatedCalories, e.notes]
@@ -129,7 +135,15 @@ async function ensureTracker(db: any, trackerId: string, userId: string, userNam
       );
       await seedTracker(db, trackerId);
     } else {
-      throw new Error("Tracker not found. Check shared ID.");
+      throw new Error("Tracker not found.");
+    }
+  } else {
+    // Access control check
+    if (tracker.ownerId !== userId) {
+      const share = await db.get("SELECT * FROM tracker_shares WHERE trackerId = ? AND userId = ?", [trackerId, userId]);
+      if (!share) {
+        throw new Error("You do not have access to this tracker.");
+      }
     }
   }
 }
@@ -544,6 +558,7 @@ app.post("/api/auth/mock", async (req, res) => {
 app.get("/api/trackers/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user!.id;
     const db = await getDb();
     const tracker = await db.get(
       "SELECT t.id, t.name, t.ownerId, u.name as ownerName FROM trackers t JOIN users u ON t.ownerId = u.id WHERE t.id = ?",
@@ -552,9 +567,153 @@ app.get("/api/trackers/:id", authenticateToken, async (req, res) => {
     if (!tracker) {
       return res.status(404).json({ error: "Tracker not found" });
     }
+
+    // Auto-join link logic: automatically add current user to tracker_shares if not owner or already sharing
+    if (tracker.ownerId !== userId) {
+      const share = await db.get("SELECT * FROM tracker_shares WHERE trackerId = ? AND userId = ?", [id, userId]);
+      if (!share) {
+        await db.run("INSERT INTO tracker_shares (trackerId, userId) VALUES (?, ?)", [id, userId]);
+        console.log(`User ${userId} joined tracker ${id} via access`);
+      }
+    }
+
     res.json(tracker);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint to list all trackers accessible to the authenticated user
+app.get("/api/trackers", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const db = await getDb();
+    const trackers = await db.all(`
+      SELECT t.id, t.name, t.ownerId, u.name as ownerName,
+             (t.ownerId = ?) as isOwner
+      FROM trackers t
+      JOIN users u ON t.ownerId = u.id
+      LEFT JOIN tracker_shares ts ON t.id = ts.trackerId
+      WHERE t.ownerId = ? OR ts.userId = ?
+      GROUP BY t.id
+      ORDER BY isOwner DESC, t.name ASC
+    `, [userId, userId, userId]);
+    
+    res.json(trackers);
+  } catch (err: any) {
+    console.error("GET /api/trackers error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch trackers" });
+  }
+});
+
+// Endpoint to create a new tracker
+app.post("/api/trackers", authenticateToken, async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || name.trim() === "") {
+      return res.status(400).json({ error: "Tracker name is required" });
+    }
+    const userId = req.user!.id;
+    const db = await getDb();
+    const newTrackerId = crypto.randomUUID();
+    
+    await db.run(
+      "INSERT INTO trackers (id, name, ownerId) VALUES (?, ?, ?)",
+      [newTrackerId, name.trim(), userId]
+    );
+    
+    res.json({ id: newTrackerId, name: name.trim(), ownerId: userId, ownerName: req.user!.name, isOwner: 1 });
+  } catch (err: any) {
+    console.error("POST /api/trackers error:", err);
+    res.status(500).json({ error: err.message || "Failed to create tracker" });
+  }
+});
+
+// Endpoint to delete a tracker (owner only, cannot delete default tracker)
+app.delete("/api/trackers/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.id;
+    const defaultTrackerId = `${userId}-default`;
+
+    if (id === defaultTrackerId) {
+      return res.status(400).json({ error: "You cannot delete your default tracker." });
+    }
+
+    const db = await getDb();
+    const tracker = await db.get("SELECT ownerId FROM trackers WHERE id = ?", [id]);
+    if (!tracker) {
+      return res.status(404).json({ error: "Tracker not found." });
+    }
+    if (tracker.ownerId !== userId) {
+      return res.status(403).json({ error: "Only the tracker owner can delete it." });
+    }
+
+    await db.run("BEGIN TRANSACTION");
+    try {
+      // Cascade: delete expense items → participants → expenses → friends → shares → tracker
+      const expenses = await db.all("SELECT id FROM expenses WHERE trackerId = ?", [id]);
+      for (const e of expenses) {
+        await db.run("DELETE FROM expense_items WHERE expenseId = ?", [e.id]);
+        await db.run("DELETE FROM expense_participants WHERE expenseId = ?", [e.id]);
+      }
+      await db.run("DELETE FROM expenses WHERE trackerId = ?", [id]);
+      await db.run("DELETE FROM friends WHERE trackerId = ?", [id]);
+      await db.run("DELETE FROM tracker_shares WHERE trackerId = ?", [id]);
+      await db.run("DELETE FROM trackers WHERE id = ?", [id]);
+      await db.run("COMMIT");
+      res.json({ success: true });
+    } catch (err) {
+      await db.run("ROLLBACK");
+      throw err;
+    }
+  } catch (err: any) {
+    console.error("DELETE /api/trackers/:id error:", err);
+    res.status(500).json({ error: err.message || "Failed to delete tracker" });
+  }
+});
+
+// Endpoint to share a tracker directly with another user by email
+app.post("/api/trackers/:id/share", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { email } = req.body;
+    const userId = req.user!.id;
+    
+    if (!email || email.trim() === "") {
+      return res.status(400).json({ error: "Email address is required to share." });
+    }
+    
+    const db = await getDb();
+    
+    // Verify current user owns this tracker
+    const tracker = await db.get("SELECT ownerId FROM trackers WHERE id = ?", [id]);
+    if (!tracker) {
+      return res.status(404).json({ error: "Tracker not found" });
+    }
+    if (tracker.ownerId !== userId) {
+      return res.status(403).json({ error: "Only the tracker owner can share it directly by email" });
+    }
+    
+    // Find target user
+    const targetUser = await db.get("SELECT id FROM users WHERE email = ?", [email.trim().toLowerCase()]);
+    if (!targetUser) {
+      return res.status(404).json({ error: `User with email "${email.trim()}" has not registered or logged in to Meals Tracker yet. You can still share this tracker by sending them the link URL.` });
+    }
+    
+    if (targetUser.id === userId) {
+      return res.status(400).json({ error: "You cannot share a tracker with yourself." });
+    }
+    
+    await db.run(
+      "INSERT OR IGNORE INTO tracker_shares (trackerId, userId) VALUES (?, ?)",
+      [id, targetUser.id]
+    );
+    
+    res.json({ success: true, message: `Tracker shared successfully with ${email.trim()}` });
+  } catch (err: any) {
+    console.error("POST /api/trackers/:id/share error:", err);
+    res.status(500).json({ error: err.message || "Failed to share tracker" });
   }
 });
 
