@@ -24,9 +24,11 @@ interface ExpenseFormProps {
   preselectedPayer?: Friend;
   editingExpense?: Expense;
   onUpdateExpense?: (expense: Expense) => void;
+  token?: string | null;
+  trackerId?: string | null;
 }
 
-export default function ExpenseForm({ friends, onAddExpense, onCancel, preselectedPayer, editingExpense, onUpdateExpense }: ExpenseFormProps) {
+export default function ExpenseForm({ friends, onAddExpense, onCancel, preselectedPayer, editingExpense, onUpdateExpense, token, trackerId }: ExpenseFormProps) {
   // Main form states
   const [title, setTitle] = useState(editingExpense?.title || "");
   const [date, setDate] = useState(editingExpense?.date || new Date().toISOString().split("T")[0]);
@@ -147,9 +149,13 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
     setAiAnalysisMethod("upload");
 
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      if (trackerId) headers["x-tracker-id"] = trackerId;
+
       const response = await fetch("/api/scan-receipt", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ image: base64Data, mimeType }),
       });
 
@@ -179,9 +185,13 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
     setAiAnalysisMethod("text");
 
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      if (trackerId) headers["x-tracker-id"] = trackerId;
+
       const response = await fetch("/api/scan-receipt", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ text: promptText }),
       });
 

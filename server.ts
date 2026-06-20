@@ -4,42 +4,50 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { getDb } from "./db";
+import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-// Increase payload limits for base64 image uploads
-app.use(express.json({ limit: "20mb" }));
-app.use(express.urlencoded({ limit: "20mb", extended: true }));
+// JWT & Google Identity Auth configurations
+const JWT_SECRET = process.env.JWT_SECRET || "meals-tracker-jwt-secret-987654";
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
-// Lazy init the Gemini client so it fails gracefully if key is missing
-let aiClient: GoogleGenAI | null = null;
-
-function getGeminiClient(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-      throw new Error("GEMINI_API_KEY is not set or is still the placeholder. Please set your credentials in Settings > Secrets.");
+// Extend Express Request for type-safety
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        name: string;
+        picture?: string;
+      };
     }
-    aiClient = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
   }
-  return aiClient;
 }
 
-// ---------------------- API ROUTES ----------------------
+// Authentication Token Validator Middleware
+function authenticateToken(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", time: new Date().toISOString() });
-});
+  if (!token) {
+    return res.status(401).json({ error: "Missing authorization token" });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+    if (err) {
+      return res.status(403).json({ error: "Invalid or expired session token" });
+    }
+    req.user = user;
+    next();
+  });
+}
 
 // Seed data constants
 const SEED_FRIENDS = [
@@ -82,11 +90,93 @@ const getSeedExpenses = () => [
   }
 ];
 
+async function seedTracker(db: any, trackerId: string) {
+  const friendsCount = await db.get("SELECT COUNT(*) as count FROM friends WHERE trackerId = ?", [trackerId]);
+  const expensesCount = await db.get("SELECT COUNT(*) as count FROM expenses WHERE trackerId = ?", [trackerId]);
+  if (friendsCount.count === 0 && expensesCount.count === 0) {
+    for (const f of SEED_FRIENDS) {
+      await db.run(
+        "INSERT INTO friends (id, trackerId, name, color) VALUES (?, ?, ?, ?)",
+        [f.id, trackerId, f.name, f.color]
+      );
+    }
+    for (const e of getSeedExpenses()) {
+      await db.run(
+        "INSERT INTO expenses (id, trackerId, title, date, paidById, amount, estimatedCalories, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [e.id, trackerId, e.title, e.date, e.paidById, e.amount, e.estimatedCalories, e.notes]
+      );
+      for (const pId of e.participants) {
+        await db.run("INSERT INTO expense_participants (expenseId, friendId) VALUES (?, ?)", [e.id, pId]);
+      }
+      for (const item of e.items) {
+        await db.run(
+          "INSERT INTO expense_items (id, expenseId, name, price, estimatedCalories) VALUES (?, ?, ?, ?, ?)",
+          [item.id, e.id, item.name, item.price, item.estimatedCalories]
+        );
+      }
+    }
+  }
+}
+
+// Scoped Tracker verification
+async function ensureTracker(db: any, trackerId: string, userId: string, userName: string) {
+  const tracker = await db.get("SELECT * FROM trackers WHERE id = ?", [trackerId]);
+  if (!tracker) {
+    if (trackerId === userId || trackerId === `${userId}-default`) {
+      await db.run(
+        "INSERT INTO trackers (id, name, ownerId) VALUES (?, ?, ?)",
+        [trackerId, `${userName}'s Tracker`, userId]
+      );
+      await seedTracker(db, trackerId);
+    } else {
+      throw new Error("Tracker not found. Check shared ID.");
+    }
+  }
+}
+
+// Increase payload limits for base64 image uploads
+app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ limit: "20mb", extended: true }));
+
+// Lazy init the Gemini client so it fails gracefully if key is missing
+let aiClient: GoogleGenAI | null = null;
+
+function getGeminiClient(): GoogleGenAI {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+      throw new Error("GEMINI_API_KEY is not set or is still the placeholder. Please set your credentials in Settings > Secrets.");
+    }
+    aiClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+  }
+  return aiClient;
+}
+
+// ---------------------- API ROUTES ----------------------
+
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", time: new Date().toISOString() });
+});
+
+// Seed data constants moved to top for scoping/hoisting
+
 // Friends API Endpoints
-app.get("/api/friends", async (req, res) => {
+app.get("/api/friends", authenticateToken, async (req, res) => {
   try {
+    const userId = req.user!.id;
+    const trackerId = (req.headers["x-tracker-id"] as string) || `${userId}-default`;
     const db = await getDb();
-    const friends = await db.all("SELECT * FROM friends");
+    
+    await ensureTracker(db, trackerId, userId, req.user!.name);
+    
+    const friends = await db.all("SELECT * FROM friends WHERE trackerId = ?", [trackerId]);
     res.json(friends);
   } catch (err: any) {
     console.error("GET /api/friends error:", err);
@@ -94,11 +184,19 @@ app.get("/api/friends", async (req, res) => {
   }
 });
 
-app.post("/api/friends", async (req, res) => {
+app.post("/api/friends", authenticateToken, async (req, res) => {
   try {
     const { id, name, color } = req.body;
+    const userId = req.user!.id;
+    const trackerId = (req.headers["x-tracker-id"] as string) || `${userId}-default`;
     const db = await getDb();
-    await db.run("INSERT INTO friends (id, name, color) VALUES (?, ?, ?)", [id, name, color]);
+    
+    await ensureTracker(db, trackerId, userId, req.user!.name);
+    
+    await db.run(
+      "INSERT INTO friends (id, trackerId, name, color) VALUES (?, ?, ?, ?)",
+      [id, trackerId, name, color]
+    );
     res.json({ success: true });
   } catch (err: any) {
     console.error("POST /api/friends error:", err);
@@ -106,11 +204,16 @@ app.post("/api/friends", async (req, res) => {
   }
 });
 
-app.delete("/api/friends/:id", async (req, res) => {
+app.delete("/api/friends/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user!.id;
+    const trackerId = (req.headers["x-tracker-id"] as string) || `${userId}-default`;
     const db = await getDb();
-    await db.run("DELETE FROM friends WHERE id = ?", [id]);
+    
+    await ensureTracker(db, trackerId, userId, req.user!.name);
+    
+    await db.run("DELETE FROM friends WHERE id = ? AND trackerId = ?", [id, trackerId]);
     res.json({ success: true });
   } catch (err: any) {
     console.error("DELETE /api/friends error:", err);
@@ -119,12 +222,23 @@ app.delete("/api/friends/:id", async (req, res) => {
 });
 
 // Expenses API Endpoints
-app.get("/api/expenses", async (req, res) => {
+app.get("/api/expenses", authenticateToken, async (req, res) => {
   try {
+    const userId = req.user!.id;
+    const trackerId = (req.headers["x-tracker-id"] as string) || `${userId}-default`;
     const db = await getDb();
-    const expensesRaw = await db.all("SELECT * FROM expenses ORDER BY date DESC");
-    const participantsRaw = await db.all("SELECT * FROM expense_participants");
-    const itemsRaw = await db.all("SELECT * FROM expense_items");
+    
+    await ensureTracker(db, trackerId, userId, req.user!.name);
+    
+    const expensesRaw = await db.all("SELECT * FROM expenses WHERE trackerId = ? ORDER BY date DESC", [trackerId]);
+    const participantsRaw = await db.all(
+      "SELECT ep.* FROM expense_participants ep JOIN expenses e ON ep.expenseId = e.id WHERE e.trackerId = ?",
+      [trackerId]
+    );
+    const itemsRaw = await db.all(
+      "SELECT ei.* FROM expense_items ei JOIN expenses e ON ei.expenseId = e.id WHERE e.trackerId = ?",
+      [trackerId]
+    );
 
     const participantsMap: Record<string, string[]> = {};
     participantsRaw.forEach((row: any) => {
@@ -163,16 +277,20 @@ app.get("/api/expenses", async (req, res) => {
   }
 });
 
-app.post("/api/expenses", async (req, res) => {
+app.post("/api/expenses", authenticateToken, async (req, res) => {
   try {
     const { id, title, date, paidById, amount, participants, receiptImage, items, estimatedCalories, notes } = req.body;
+    const userId = req.user!.id;
+    const trackerId = (req.headers["x-tracker-id"] as string) || `${userId}-default`;
     const db = await getDb();
+    
+    await ensureTracker(db, trackerId, userId, req.user!.name);
     
     await db.run("BEGIN TRANSACTION");
     try {
       await db.run(
-        "INSERT INTO expenses (id, title, date, paidById, amount, estimatedCalories, notes, receiptImage) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        [id, title, date, paidById, amount, estimatedCalories, notes || null, receiptImage || null]
+        "INSERT INTO expenses (id, trackerId, title, date, paidById, amount, estimatedCalories, notes, receiptImage) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [id, trackerId, title, date, paidById, amount, estimatedCalories, notes || null, receiptImage || null]
       );
       
       for (const friendId of participants) {
@@ -201,17 +319,26 @@ app.post("/api/expenses", async (req, res) => {
   }
 });
 
-app.put("/api/expenses/:id", async (req, res) => {
+app.put("/api/expenses/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, date, paidById, amount, participants, receiptImage, items, estimatedCalories, notes } = req.body;
+    const userId = req.user!.id;
+    const trackerId = (req.headers["x-tracker-id"] as string) || `${userId}-default`;
     const db = await getDb();
+
+    await ensureTracker(db, trackerId, userId, req.user!.name);
 
     await db.run("BEGIN TRANSACTION");
     try {
+      const existing = await db.get("SELECT id FROM expenses WHERE id = ? AND trackerId = ?", [id, trackerId]);
+      if (!existing) {
+        throw new Error("Expense record not found in this tracker");
+      }
+
       await db.run(
-        "UPDATE expenses SET title = ?, date = ?, paidById = ?, amount = ?, estimatedCalories = ?, notes = ?, receiptImage = ? WHERE id = ?",
-        [title, date, paidById, amount, estimatedCalories, notes || null, receiptImage || null, id]
+        "UPDATE expenses SET title = ?, date = ?, paidById = ?, amount = ?, estimatedCalories = ?, notes = ?, receiptImage = ? WHERE id = ? AND trackerId = ?",
+        [title, date, paidById, amount, estimatedCalories, notes || null, receiptImage || null, id, trackerId]
       );
       
       await db.run("DELETE FROM expense_participants WHERE expenseId = ?", [id]);
@@ -242,11 +369,16 @@ app.put("/api/expenses/:id", async (req, res) => {
   }
 });
 
-app.delete("/api/expenses/:id", async (req, res) => {
+app.delete("/api/expenses/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user!.id;
+    const trackerId = (req.headers["x-tracker-id"] as string) || `${userId}-default`;
     const db = await getDb();
-    await db.run("DELETE FROM expenses WHERE id = ?", [id]);
+    
+    await ensureTracker(db, trackerId, userId, req.user!.name);
+    
+    await db.run("DELETE FROM expenses WHERE id = ? AND trackerId = ?", [id, trackerId]);
     res.json({ success: true });
   } catch (err: any) {
     console.error("DELETE /api/expenses error:", err);
@@ -255,13 +387,18 @@ app.delete("/api/expenses/:id", async (req, res) => {
 });
 
 // Database reset/restore seed APIs
-app.post("/api/db/reset", async (req, res) => {
+app.post("/api/db/reset", authenticateToken, async (req, res) => {
   try {
+    const userId = req.user!.id;
+    const trackerId = (req.headers["x-tracker-id"] as string) || `${userId}-default`;
     const db = await getDb();
+    
+    await ensureTracker(db, trackerId, userId, req.user!.name);
+
     await db.run("BEGIN TRANSACTION");
     try {
-      await db.run("DELETE FROM friends");
-      await db.run("DELETE FROM expenses");
+      await db.run("DELETE FROM friends WHERE trackerId = ?", [trackerId]);
+      await db.run("DELETE FROM expenses WHERE trackerId = ?", [trackerId]);
       await db.run("COMMIT");
       res.json({ success: true });
     } catch (err) {
@@ -274,22 +411,30 @@ app.post("/api/db/reset", async (req, res) => {
   }
 });
 
-app.post("/api/db/restore", async (req, res) => {
+app.post("/api/db/restore", authenticateToken, async (req, res) => {
   try {
+    const userId = req.user!.id;
+    const trackerId = (req.headers["x-tracker-id"] as string) || `${userId}-default`;
     const db = await getDb();
+    
+    await ensureTracker(db, trackerId, userId, req.user!.name);
+
     await db.run("BEGIN TRANSACTION");
     try {
-      await db.run("DELETE FROM friends");
-      await db.run("DELETE FROM expenses");
+      await db.run("DELETE FROM friends WHERE trackerId = ?", [trackerId]);
+      await db.run("DELETE FROM expenses WHERE trackerId = ?", [trackerId]);
       
       for (const f of SEED_FRIENDS) {
-        await db.run("INSERT INTO friends (id, name, color) VALUES (?, ?, ?)", [f.id, f.name, f.color]);
+        await db.run(
+          "INSERT INTO friends (id, trackerId, name, color) VALUES (?, ?, ?, ?)",
+          [f.id, trackerId, f.name, f.color]
+        );
       }
       
       for (const e of getSeedExpenses()) {
         await db.run(
-          "INSERT INTO expenses (id, title, date, paidById, amount, estimatedCalories, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          [e.id, e.title, e.date, e.paidById, e.amount, e.estimatedCalories, e.notes]
+          "INSERT INTO expenses (id, trackerId, title, date, paidById, amount, estimatedCalories, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          [e.id, trackerId, e.title, e.date, e.paidById, e.amount, e.estimatedCalories, e.notes]
         );
         
         for (const pId of e.participants) {
@@ -313,6 +458,152 @@ app.post("/api/db/restore", async (req, res) => {
   } catch (err: any) {
     console.error("POST /api/db/restore error:", err);
     res.status(500).json({ error: err.message || "Failed to restore database samples" });
+  }
+});
+
+// Authentication Routes
+
+// Config Endpoint to send GOOGLE_CLIENT_ID to the UI
+app.get("/api/config", (req, res) => {
+  res.json({
+    googleClientId: GOOGLE_CLIENT_ID || null,
+  });
+});
+
+// Google Sign-In verification endpoint
+app.post("/api/auth/google", async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ error: "Missing credential token" });
+    }
+
+    let payload: any;
+
+    if (GOOGLE_CLIENT_ID && googleClient) {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+    } else {
+      console.warn("GOOGLE_CLIENT_ID is not configured. Falling back to Mock Verification.");
+      payload = jwt.decode(credential);
+    }
+
+    if (!payload || !payload.sub || !payload.email) {
+      return res.status(400).json({ error: "Invalid Google credential payload" });
+    }
+
+    const db = await getDb();
+    
+    const existingUser = await db.get("SELECT * FROM users WHERE id = ?", [payload.sub]);
+    if (!existingUser) {
+      await db.run(
+        "INSERT INTO users (id, email, name, picture) VALUES (?, ?, ?, ?)",
+        [payload.sub, payload.email, payload.name || "Google User", payload.picture || null]
+      );
+    } else {
+      await db.run(
+        "UPDATE users SET name = ?, picture = ? WHERE id = ?",
+        [payload.name || existingUser.name, payload.picture || existingUser.picture, payload.sub]
+      );
+    }
+
+    const defaultTrackerId = `${payload.sub}-default`;
+    await ensureTracker(db, defaultTrackerId, payload.sub, payload.name || "Google User");
+
+    const token = jwt.sign(
+      {
+        id: payload.sub,
+        email: payload.email,
+        name: payload.name || "Google User",
+        picture: payload.picture || "",
+      },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: payload.sub,
+        email: payload.email,
+        name: payload.name || "Google User",
+        picture: payload.picture || "",
+      },
+      defaultTrackerId,
+    });
+  } catch (err: any) {
+    console.error("Google Auth error:", err);
+    res.status(500).json({ error: err.message || "Failed to authenticate with Google" });
+  }
+});
+
+// Developer Mock Bypass login endpoint
+app.post("/api/auth/mock", async (req, res) => {
+  try {
+    const { email, name } = req.body;
+    if (!email || !name) {
+      return res.status(400).json({ error: "Email and Name are required for Mock login" });
+    }
+
+    const mockId = `mock-user-${Buffer.from(email).toString("hex").slice(0, 12)}`;
+    const db = await getDb();
+    
+    const existingUser = await db.get("SELECT * FROM users WHERE id = ?", [mockId]);
+    if (!existingUser) {
+      await db.run(
+        "INSERT INTO users (id, email, name, picture) VALUES (?, ?, ?, ?)",
+        [mockId, email, name, `https://api.dicebear.com/7.x/initials/svg?seed=${name}`]
+      );
+    }
+
+    const defaultTrackerId = `${mockId}-default`;
+    await ensureTracker(db, defaultTrackerId, mockId, name);
+
+    const token = jwt.sign(
+      {
+        id: mockId,
+        email,
+        name,
+        picture: `https://api.dicebear.com/7.x/initials/svg?seed=${name}`,
+      },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: mockId,
+        email,
+        name,
+        picture: `https://api.dicebear.com/7.x/initials/svg?seed=${name}`,
+      },
+      defaultTrackerId,
+    });
+  } catch (err: any) {
+    console.error("Mock Auth error:", err);
+    res.status(500).json({ error: err.message || "Failed to authenticate in Mock Mode" });
+  }
+});
+
+// Endpoint to fetch tracker details
+app.get("/api/trackers/:id", authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDb();
+    const tracker = await db.get(
+      "SELECT t.id, t.name, t.ownerId, u.name as ownerName FROM trackers t JOIN users u ON t.ownerId = u.id WHERE t.id = ?",
+      [id]
+    );
+    if (!tracker) {
+      return res.status(404).json({ error: "Tracker not found" });
+    }
+    res.json(tracker);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -432,38 +723,7 @@ async function initServer() {
   console.log("Initializing database...");
   const db = await getDb();
 
-  // Auto-seed if database is empty on first launch
-  const friendsCount = await db.get("SELECT COUNT(*) as count FROM friends");
-  const expensesCount = await db.get("SELECT COUNT(*) as count FROM expenses");
-  if (friendsCount.count === 0 && expensesCount.count === 0) {
-    console.log("Database is empty. Auto-seeding initial sample data...");
-    await db.run("BEGIN TRANSACTION");
-    try {
-      for (const f of SEED_FRIENDS) {
-        await db.run("INSERT INTO friends (id, name, color) VALUES (?, ?, ?)", [f.id, f.name, f.color]);
-      }
-      for (const e of getSeedExpenses()) {
-        await db.run(
-          "INSERT INTO expenses (id, title, date, paidById, amount, estimatedCalories, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          [e.id, e.title, e.date, e.paidById, e.amount, e.estimatedCalories, e.notes]
-        );
-        for (const pId of e.participants) {
-          await db.run("INSERT INTO expense_participants (expenseId, friendId) VALUES (?, ?)", [e.id, pId]);
-        }
-        for (const item of e.items) {
-          await db.run(
-            "INSERT INTO expense_items (id, expenseId, name, price, estimatedCalories) VALUES (?, ?, ?, ?, ?)",
-            [item.id, e.id, item.name, item.price, item.estimatedCalories]
-          );
-        }
-      }
-      await db.run("COMMIT");
-      console.log("Auto-seeding completed successfully.");
-    } catch (err) {
-      await db.run("ROLLBACK");
-      console.error("Auto-seeding failed:", err);
-    }
-  }
+  // Note: Seeding is now handled per-tracker dynamically upon user registration/default tracker creation.
 
   if (process.env.NODE_ENV !== "production") {
     console.log("Starting server in DEVELOPMENT mode...");

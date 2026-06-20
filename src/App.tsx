@@ -49,6 +49,21 @@ const SEED_EXPENSES: Expense[] = [
 ];
 
 export default function App() {
+  // Authentication states
+  const [token, setToken] = useState<string | null>(localStorage.getItem("meal_tracker_token"));
+  const [user, setUser] = useState<any | null>(() => {
+    const saved = localStorage.getItem("meal_tracker_user");
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [defaultTrackerId, setDefaultTrackerId] = useState<string | null>(localStorage.getItem("meal_tracker_default_id"));
+  const [trackerId, setTrackerId] = useState<string | null>(null);
+  const [googleClientId, setGoogleClientId] = useState<string | null>(null);
+  const [sharedTrackerInfo, setSharedTrackerInfo] = useState<{ id: string; name: string; ownerName: string } | null>(null);
+  const [showMockLogin, setShowMockLogin] = useState(false);
+  const [mockEmail, setMockEmail] = useState("");
+  const [mockName, setMockName] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+
   const [friends, setFriends] = useState<Friend[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [activeTab, setActiveTab] = useState<"dashboard" | "friends">("dashboard");
@@ -87,15 +102,148 @@ export default function App() {
     return true;
   });
 
-  // Fetch initial data from SQLite backend on mount
+  const handleLogout = () => {
+    localStorage.removeItem("meal_tracker_token");
+    localStorage.removeItem("meal_tracker_user");
+    localStorage.removeItem("meal_tracker_default_id");
+    setToken(null);
+    setUser(null);
+    setDefaultTrackerId(null);
+    setTrackerId(null);
+    setSharedTrackerInfo(null);
+  };
+
+  // API Fetch Helper wrapping Authorization and Tracker ID headers
+  const apiFetch = async (url: string, options: RequestInit = {}) => {
+    const headers = {
+      ...(options.headers || {}),
+    } as Record<string, string>;
+
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    if (trackerId) {
+      headers["x-tracker-id"] = trackerId;
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      handleLogout();
+      throw new Error("Session expired or unauthorized. Please log in again.");
+    }
+
+    return response;
+  };
+
+  // Load configuration & URL parameters on mount
   useEffect(() => {
-    const fetchData = async () => {
+    const loadConfig = async () => {
       try {
-        const friendsRes = await fetch("/api/friends");
+        const res = await fetch("/api/config");
+        const config = await res.json();
+        setGoogleClientId(config.googleClientId);
+      } catch (err) {
+        console.error("Failed to load auth config:", err);
+      }
+    };
+    loadConfig();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryTracker = urlParams.get("tracker");
+    if (queryTracker) {
+      setTrackerId(queryTracker);
+    }
+  }, []);
+
+  // Update trackerId when defaultTrackerId is retrieved (if not already viewing a shared tracker)
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryTracker = urlParams.get("tracker");
+    if (!queryTracker && defaultTrackerId) {
+      setTrackerId(defaultTrackerId);
+    }
+  }, [defaultTrackerId]);
+
+  // Load Google GIS library dynamically
+  useEffect(() => {
+    if (!googleClientId || token) return;
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      const g = (window as any).google;
+      if (g) {
+        g.accounts.id.initialize({
+          client_id: googleClientId,
+          callback: handleGoogleSignInResponse,
+        });
+        
+        const btnContainer = document.getElementById("google-signin-button");
+        if (btnContainer) {
+          g.accounts.id.renderButton(btnContainer, {
+            theme: "outline",
+            size: "large",
+            width: 280,
+          });
+        }
+      }
+    };
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, [googleClientId, token, showMockLogin]);
+
+  // Fetch shared tracker info if viewing someone else's tracker
+  useEffect(() => {
+    if (!token || !trackerId) return;
+    if (defaultTrackerId && trackerId === defaultTrackerId) {
+      setSharedTrackerInfo(null);
+      return;
+    }
+
+    const fetchTrackerInfo = async () => {
+      try {
+        const res = await fetch(`/api/trackers/${trackerId}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const info = await res.json();
+          setSharedTrackerInfo(info);
+        }
+      } catch (err) {
+        console.error("Failed to fetch tracker info:", err);
+      }
+    };
+    fetchTrackerInfo();
+  }, [token, trackerId, defaultTrackerId]);
+
+  // Fetch initial data from SQLite backend when token and trackerId are ready
+  useEffect(() => {
+    if (!token || !trackerId) {
+      setFriends([]);
+      setExpenses([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        const friendsRes = await apiFetch("/api/friends");
         const friendsData = await friendsRes.json();
         setFriends(friendsData);
 
-        const expensesRes = await fetch("/api/expenses");
+        const expensesRes = await apiFetch("/api/expenses");
         const expensesData = await expensesRes.json();
         setExpenses(expensesData);
       } catch (err) {
@@ -105,7 +253,98 @@ export default function App() {
       }
     };
     fetchData();
-  }, []);
+  }, [token, trackerId]);
+
+  const handleGoogleSignInResponse = async (response: any) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential: response.credential }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed Google login");
+      }
+      const data = await res.json();
+      localStorage.setItem("meal_tracker_token", data.token);
+      localStorage.setItem("meal_tracker_user", JSON.stringify(data.user));
+      localStorage.setItem("meal_tracker_default_id", data.defaultTrackerId);
+      
+      setToken(data.token);
+      setUser(data.user);
+      setDefaultTrackerId(data.defaultTrackerId);
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      if (!urlParams.get("tracker")) {
+        setTrackerId(data.defaultTrackerId);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Error logging in with Google.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMockLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mockName.trim() || !mockEmail.trim()) {
+      alert("Name and email are required for developer mock login");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await fetch("/api/auth/mock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: mockName.trim(), email: mockEmail.trim() }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed Mock login");
+      }
+      const data = await res.json();
+      localStorage.setItem("meal_tracker_token", data.token);
+      localStorage.setItem("meal_tracker_user", JSON.stringify(data.user));
+      localStorage.setItem("meal_tracker_default_id", data.defaultTrackerId);
+      
+      setToken(data.token);
+      setUser(data.user);
+      setDefaultTrackerId(data.defaultTrackerId);
+      
+      const urlParams = new URLSearchParams(window.location.search);
+      if (!urlParams.get("tracker")) {
+        setTrackerId(data.defaultTrackerId);
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Error logging in with Mock mode.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleShareTracker = () => {
+    const shareId = defaultTrackerId || trackerId;
+    if (!shareId) return;
+    const shareUrl = `${window.location.origin}/?tracker=${shareId}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setToast("Tracker share link copied to clipboard!");
+      setTimeout(() => setToast(null), 3000);
+    }).catch(err => {
+      console.error("Failed to copy share link:", err);
+    });
+  };
+
+  const handleSwitchToDefault = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("tracker");
+    window.history.pushState({}, "", url.toString());
+    setTrackerId(defaultTrackerId);
+    setSharedTrackerInfo(null);
+  };
 
   // State manipulation handlers communicating with the SQLite API
   const handleAddFriend = async (name: string, color: string) => {
@@ -115,7 +354,7 @@ export default function App() {
       color,
     };
     try {
-      const response = await fetch("/api/friends", {
+      const response = await apiFetch("/api/friends", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newFriend),
@@ -130,7 +369,7 @@ export default function App() {
 
   const handleDeleteFriend = async (id: string) => {
     try {
-      const response = await fetch(`/api/friends/${id}`, {
+      const response = await apiFetch(`/api/friends/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete friend from database");
@@ -147,7 +386,7 @@ export default function App() {
       id: crypto.randomUUID(),
     };
     try {
-      const response = await fetch("/api/expenses", {
+      const response = await apiFetch("/api/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newExpense),
@@ -164,7 +403,7 @@ export default function App() {
 
   const handleUpdateExpense = async (updatedExpense: Expense) => {
     try {
-      const response = await fetch(`/api/expenses/${updatedExpense.id}`, {
+      const response = await apiFetch(`/api/expenses/${updatedExpense.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedExpense),
@@ -186,7 +425,7 @@ export default function App() {
 
   const handleDeleteExpense = async (id: string) => {
     try {
-      const response = await fetch(`/api/expenses/${id}`, {
+      const response = await apiFetch(`/api/expenses/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete expense from database");
@@ -207,7 +446,7 @@ export default function App() {
   const handleResetData = async () => {
     if (confirm("Reset application? All logged expenses and friend lists will be cleared.")) {
       try {
-        const response = await fetch("/api/db/reset", { method: "POST" });
+        const response = await apiFetch("/api/db/reset", { method: "POST" });
         if (!response.ok) throw new Error("Failed to reset database");
         setFriends([]);
         setExpenses([]);
@@ -221,14 +460,14 @@ export default function App() {
   // Restore Seed Templates
   const handleRestoreSamples = async () => {
     try {
-      const response = await fetch("/api/db/restore", { method: "POST" });
+      const response = await apiFetch("/api/db/restore", { method: "POST" });
       if (!response.ok) throw new Error("Failed to restore seed templates");
       
-      const friendsRes = await fetch("/api/friends");
+      const friendsRes = await apiFetch("/api/friends");
       const friendsData = await friendsRes.json();
       setFriends(friendsData);
 
-      const expensesRes = await fetch("/api/expenses");
+      const expensesRes = await apiFetch("/api/expenses");
       const expensesData = await expensesRes.json();
       setExpenses(expensesData);
     } catch (err) {
@@ -236,6 +475,132 @@ export default function App() {
       alert("Error restoring samples.");
     }
   };
+
+  // Whenever token is cleared or showMockLogin changes, try to render the Google button
+  useEffect(() => {
+    if (!token && googleClientId && !showMockLogin) {
+      const g = (window as any).google;
+      if (g) {
+        const timer = setTimeout(() => {
+          const btnContainer = document.getElementById("google-signin-button");
+          if (btnContainer) {
+            g.accounts.id.renderButton(btnContainer, {
+              theme: "outline",
+              size: "large",
+              width: 280,
+            });
+          }
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [token, googleClientId, showMockLogin]);
+
+  if (!token || !user) {
+    return (
+      <div className="min-h-screen bg-stone-900 text-white flex flex-col justify-center items-center px-4 relative overflow-hidden">
+        {/* Glow ambient effects */}
+        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-amber-500/10 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-orange-600/10 blur-[120px] pointer-events-none" />
+
+        <div className="max-w-md w-full text-center space-y-8 z-10">
+          <div className="space-y-4">
+            <div className="w-16 h-16 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-3xl flex items-center justify-center shadow-lg shadow-amber-500/25 mx-auto">
+              <UtensilsCrossed className="w-8 h-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight font-display bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
+                Meals Tracker
+              </h1>
+              <p className="text-sm text-stone-400 mt-2">
+                A collaborative culinary ledger & portion-level split manager.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-stone-850/50 backdrop-blur-xl border border-stone-800 p-8 rounded-3xl shadow-2xl space-y-6">
+            {googleClientId ? (
+              <div className="space-y-4 flex flex-col items-center">
+                <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider">
+                  Sign In to Continue
+                </p>
+                <div id="google-signin-button" className="min-h-[44px] flex justify-center items-center w-full" />
+                
+                <div className="relative w-full py-2">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-stone-800" /></div>
+                  <div className="relative flex justify-center text-xs uppercase"><span className="bg-stone-900 px-3 text-stone-500 font-bold tracking-widest text-[9px]">Or Use Mock Bypass</span></div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-2 text-stone-400 text-xs">
+                <Sparkles className="w-5 h-5 text-amber-500 mx-auto mb-2 animate-pulse" />
+                <p className="font-semibold text-stone-300">Mock Authentication Mode</p>
+                <p className="mt-1">Google client ID is not configured. Falling back to local developer mode.</p>
+              </div>
+            )}
+
+            {(!googleClientId || showMockLogin) ? (
+              <form onSubmit={handleMockLogin} className="space-y-4 text-left">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold text-stone-400 uppercase tracking-wider">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Jane Doe"
+                    value={mockName}
+                    onChange={(e) => setMockName(e.target.value)}
+                    className="w-full bg-stone-950/40 border border-stone-800 rounded-xl px-3 py-2.5 outline-none focus:border-stone-600 text-sm text-white transition-colors"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-extrabold text-stone-400 uppercase tracking-wider">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="jane.doe@example.com"
+                    value={mockEmail}
+                    onChange={(e) => setMockEmail(e.target.value)}
+                    className="w-full bg-stone-950/40 border border-stone-800 rounded-xl px-3 py-2.5 outline-none focus:border-stone-600 text-sm text-white transition-colors"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-stone-950 font-bold py-3 px-4 rounded-xl text-sm transition-colors cursor-pointer shadow-md shadow-amber-500/10 flex items-center justify-center gap-1.5"
+                >
+                  <Smile className="w-4 h-4" /> Enter Sandbox
+                </button>
+                {googleClientId && (
+                  <button
+                    type="button"
+                    onClick={() => setShowMockLogin(false)}
+                    className="w-full text-center text-xs text-stone-400 hover:text-stone-300 font-semibold underline mt-2 block"
+                  >
+                    Back to Google Sign-In
+                  </button>
+                )}
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowMockLogin(true)}
+                className="w-full bg-stone-800/40 hover:bg-stone-800 text-stone-300 hover:text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-colors cursor-pointer border border-stone-850"
+              >
+                Show Developer Mock Login
+              </button>
+            )}
+          </div>
+
+          <div className="text-[10px] text-stone-600 font-semibold uppercase tracking-wider">
+            Secured via JSON Web Token (JWT)
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-16 flex flex-col pt-1" id="applet-viewport">
@@ -258,7 +623,34 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* User Profile and Share Controls */}
+            <div className="flex items-center gap-2 border-r border-stone-200 pr-3">
+              <img
+                src={user.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`}
+                alt={user.name}
+                className="w-8 h-8 rounded-full border border-stone-200 object-cover"
+              />
+              <div className="hidden md:block text-left">
+                <p className="text-xs font-bold text-stone-850">{user.name}</p>
+                <p className="text-[9px] text-stone-400 font-medium">{user.email}</p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-[10px] text-stone-500 hover:text-stone-850 transition-colors uppercase font-extrabold tracking-wider ml-1 cursor-pointer"
+              >
+                Logout
+              </button>
+            </div>
+
+            <button
+              onClick={handleShareTracker}
+              className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Share Tracker</span>
+            </button>
+
             {/* Quick-toggle tabs */}
             <div className="bg-stone-100 p-1 rounded-xl flex items-center gap-1 font-semibold text-xs">
               <button
@@ -305,6 +697,19 @@ export default function App() {
         </div>
       </header>
 
+      {/* Shared Tracker Banner */}
+      {sharedTrackerInfo && (
+        <div className="bg-amber-50 border-b border-amber-200 py-2.5 px-4 text-center text-xs font-semibold text-amber-800 flex items-center justify-center gap-2">
+          <span>Viewing shared tracker: <strong className="text-amber-950 font-bold">{sharedTrackerInfo.name}</strong> (owned by {sharedTrackerInfo.ownerName})</span>
+          <button
+            onClick={handleSwitchToDefault}
+            className="bg-white hover:bg-amber-100 text-amber-900 border border-amber-200/80 px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wide cursor-pointer transition-colors"
+          >
+            Back to My Tracker
+          </button>
+        </div>
+      )}
+
       {/* Main Container Stage */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8 sm:px-6">
 
@@ -333,6 +738,8 @@ export default function App() {
                 preselectedPayer={preselectedFormPayer}
                 editingExpense={editingExpense}
                 onUpdateExpense={handleUpdateExpense}
+                token={token}
+                trackerId={trackerId}
               />
             </motion.div>
           ) : activeTab === "dashboard" ? (
@@ -473,6 +880,14 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Floating share notification toast */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 bg-stone-900 text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-xs font-semibold z-50 animate-bounce">
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          <span>{toast}</span>
+        </div>
+      )}
 
     </div>
   );
