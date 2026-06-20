@@ -159,7 +159,7 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("meal_tracker_theme", theme);
     const root = window.document.documentElement;
-    
+
     const applyTheme = () => {
       root.classList.remove("light", "dark");
       if (theme === "system") {
@@ -416,7 +416,7 @@ export default function App() {
           client_id: googleClientId,
           callback: handleGoogleSignInResponse,
         });
-        
+
         const btnContainer = document.getElementById("google-signin-button");
         if (btnContainer) {
           g.accounts.id.renderButton(btnContainer, {
@@ -473,7 +473,7 @@ export default function App() {
     const poll = setInterval(async () => {
       try {
         const [fRes, eRes] = await Promise.all([
-          fetch("/api/friends",  { headers: { "Authorization": `Bearer ${token}`, "x-tracker-id": trackerId } }),
+          fetch("/api/friends", { headers: { "Authorization": `Bearer ${token}`, "x-tracker-id": trackerId } }),
           fetch("/api/expenses", { headers: { "Authorization": `Bearer ${token}`, "x-tracker-id": trackerId } }),
         ]);
         if (fRes.ok) setFriends(await fRes.json());
@@ -534,11 +534,11 @@ export default function App() {
       localStorage.setItem("meal_tracker_token", data.token);
       localStorage.setItem("meal_tracker_user", JSON.stringify(data.user));
       localStorage.setItem("meal_tracker_default_id", data.defaultTrackerId);
-      
+
       setToken(data.token);
       setUser(data.user);
       setDefaultTrackerId(data.defaultTrackerId);
-      
+
       const urlParams = new URLSearchParams(window.location.search);
       if (!urlParams.get("tracker")) {
         setTrackerId(data.defaultTrackerId);
@@ -572,11 +572,11 @@ export default function App() {
       localStorage.setItem("meal_tracker_token", data.token);
       localStorage.setItem("meal_tracker_user", JSON.stringify(data.user));
       localStorage.setItem("meal_tracker_default_id", data.defaultTrackerId);
-      
+
       setToken(data.token);
       setUser(data.user);
       setDefaultTrackerId(data.defaultTrackerId);
-      
+
       const urlParams = new URLSearchParams(window.location.search);
       if (!urlParams.get("tracker")) {
         setTrackerId(data.defaultTrackerId);
@@ -771,7 +771,7 @@ export default function App() {
                   Sign In to Continue
                 </p>
                 <div id="google-signin-button" className="min-h-[44px] flex justify-center items-center w-full" />
-                
+
                 <div className="relative w-full py-2">
                   <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-stone-800" /></div>
                   <div className="relative flex justify-center text-xs uppercase"><span className="bg-stone-900 px-3 text-stone-500 font-bold tracking-widest text-[9px]">Or Use Mock Bypass</span></div>
@@ -959,17 +959,15 @@ export default function App() {
               <div className="bg-stone-100 dark:bg-stone-800 p-0.5 rounded-xl flex gap-0.5 mb-4 text-xs font-semibold border border-stone-200/40 dark:border-stone-700/40">
                 <button
                   onClick={() => { setShareMode("link"); setShareResult(null); }}
-                  className={`flex-1 py-1.5 rounded-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    shareMode === "link" ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs" : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
-                  }`}
+                  className={`flex-1 py-1.5 rounded-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer ${shareMode === "link" ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs" : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
+                    }`}
                 >
                   <Link className="w-3 h-3" /> Copy Link
                 </button>
                 <button
                   onClick={() => { setShareMode("email"); setShareResult(null); }}
-                  className={`flex-1 py-1.5 rounded-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    shareMode === "email" ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs" : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
-                  }`}
+                  className={`flex-1 py-1.5 rounded-[10px] flex items-center justify-center gap-1.5 transition-all cursor-pointer ${shareMode === "email" ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs" : "text-stone-500 hover:text-stone-800 dark:hover:text-stone-300"
+                    }`}
                 >
                   <Mail className="w-3 h-3" /> By Email
                 </button>
@@ -1000,7 +998,7 @@ export default function App() {
                     className="w-full bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl px-3 py-2.5 outline-none focus:border-amber-400 dark:focus:border-amber-500 text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 transition-colors"
                   />
                   {shareResult && (
-                    <p className={`text-[11px] font-semibold px-1 ${ shareResult.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400" }`}>
+                    <p className={`text-[11px] font-semibold px-1 ${shareResult.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
                       {shareResult.msg}
                     </p>
                   )}
@@ -1053,8 +1051,8 @@ export default function App() {
                   setIsAddingExpense(false);
                 }}
                 className={`flex-1 sm:flex-initial text-center px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === "dashboard" && !isAddingExpense
-                    ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs"
-                    : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                  ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs"
+                  : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
                   }`}
               >
                 Ledger
@@ -1065,8 +1063,8 @@ export default function App() {
                   setIsAddingExpense(false);
                 }}
                 className={`flex-1 sm:flex-initial text-center px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === "friends" && !isAddingExpense
-                    ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs"
-                    : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                  ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs"
+                  : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
                   }`}
               >
                 Friends ({friends.length})
@@ -1142,26 +1140,23 @@ export default function App() {
                         return (
                           <div
                             key={t.id}
-                            className={`group flex items-center gap-2 rounded-xl px-2 py-1.5 transition-colors ${
-                              isActive
+                            className={`group flex items-center gap-2 rounded-xl px-2 py-1.5 transition-colors ${isActive
                                 ? "bg-amber-50 dark:bg-amber-950/25 border border-amber-200/60 dark:border-amber-800/30"
                                 : "hover:bg-stone-100 dark:hover:bg-stone-800/60 border border-transparent"
-                            }`}
+                              }`}
                           >
                             <button
                               onClick={() => !isActive && handleSwitchTracker(t)}
                               className="flex-1 flex items-center gap-2 min-w-0 text-left cursor-pointer"
                               disabled={isActive}
                             >
-                              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
-                                isActive ? "bg-amber-500 text-white" : "bg-stone-100 dark:bg-stone-800 text-stone-500"
-                              }`}>
+                              <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${isActive ? "bg-amber-500 text-white" : "bg-stone-100 dark:bg-stone-800 text-stone-500"
+                                }`}>
                                 {isActive ? <Check className="w-3 h-3" /> : <FolderOpen className="w-3 h-3" />}
                               </div>
                               <div className="min-w-0">
-                                <p className={`text-[11px] font-semibold truncate ${
-                                  isActive ? "text-amber-800 dark:text-amber-300" : "text-stone-800 dark:text-stone-200"
-                                }`}>{t.name}</p>
+                                <p className={`text-[11px] font-semibold truncate ${isActive ? "text-amber-800 dark:text-amber-300" : "text-stone-800 dark:text-stone-200"
+                                  }`}>{t.name}</p>
                                 {!isOwned && (
                                   <p className="text-[9px] text-stone-400 dark:text-stone-500 truncate">by {t.ownerName}</p>
                                 )}
@@ -1172,7 +1167,7 @@ export default function App() {
                             </button>
 
                             {/* Share & delete controls — visible on hover */}
-                            <div className={`flex items-center gap-0.5 transition-opacity ${ isDeleting ? "opacity-100" : "opacity-0 group-hover:opacity-100" }`}>
+                            <div className={`flex items-center gap-0.5 transition-opacity ${isDeleting ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                               {isOwned && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); setShareModalTracker(t); setShareMode("link"); setShareResult(null); setIsProfileMenuOpen(false); }}
@@ -1216,9 +1211,8 @@ export default function App() {
                     <div className="bg-stone-100 dark:bg-stone-800 p-0.5 rounded-xl flex items-center gap-0.5 font-semibold text-xs border border-stone-200/40 dark:border-stone-700/40">
                       <button
                         onClick={() => setTheme("light")}
-                        className={`flex-1 py-1.5 rounded-[10px] transition-all cursor-pointer flex justify-center items-center gap-1.5 ${
-                          theme === "light" ? "bg-white dark:bg-stone-900 text-amber-500 shadow-xs" : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
-                        }`}
+                        className={`flex-1 py-1.5 rounded-[10px] transition-all cursor-pointer flex justify-center items-center gap-1.5 ${theme === "light" ? "bg-white dark:bg-stone-900 text-amber-500 shadow-xs" : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                          }`}
                         title="Light Mode"
                       >
                         <Sun className="w-3.5 h-3.5" />
@@ -1226,9 +1220,8 @@ export default function App() {
                       </button>
                       <button
                         onClick={() => setTheme("dark")}
-                        className={`flex-1 py-1.5 rounded-[10px] transition-all cursor-pointer flex justify-center items-center gap-1.5 ${
-                          theme === "dark" ? "bg-white dark:bg-stone-900 text-indigo-400 shadow-xs" : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
-                        }`}
+                        className={`flex-1 py-1.5 rounded-[10px] transition-all cursor-pointer flex justify-center items-center gap-1.5 ${theme === "dark" ? "bg-white dark:bg-stone-900 text-indigo-400 shadow-xs" : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                          }`}
                         title="Dark Mode"
                       >
                         <Moon className="w-3.5 h-3.5" />
@@ -1236,9 +1229,8 @@ export default function App() {
                       </button>
                       <button
                         onClick={() => setTheme("system")}
-                        className={`flex-1 py-1.5 rounded-[10px] transition-all cursor-pointer flex justify-center items-center gap-1.5 ${
-                          theme === "system" ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs" : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
-                        }`}
+                        className={`flex-1 py-1.5 rounded-[10px] transition-all cursor-pointer flex justify-center items-center gap-1.5 ${theme === "system" ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs" : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                          }`}
                         title="System Mode"
                       >
                         <Monitor className="w-3.5 h-3.5" />
@@ -1309,7 +1301,7 @@ export default function App() {
                 setIsLoading(true);
                 try {
                   const [fRes, eRes] = await Promise.all([
-                    fetch("/api/friends",  { headers: { "Authorization": `Bearer ${token}`, "x-tracker-id": trackerId! } }),
+                    fetch("/api/friends", { headers: { "Authorization": `Bearer ${token}`, "x-tracker-id": trackerId! } }),
                     fetch("/api/expenses", { headers: { "Authorization": `Bearer ${token}`, "x-tracker-id": trackerId! } }),
                   ]);
                   if (fRes.ok) setFriends(await fRes.json());
@@ -1340,137 +1332,137 @@ export default function App() {
           </div>
         ) : (
           <AnimatePresence mode="wait">
-          {isAddingExpense ? (
-            <motion.div
-              key="expense-form-wrapper"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              <ExpenseForm
-                friends={friends}
-                onAddExpense={handleAddExpense}
-                onCancel={() => {
-                  setIsAddingExpense(false);
-                  setPreselectedFormPayer(undefined);
-                  setEditingExpense(undefined);
-                }}
-                preselectedPayer={preselectedFormPayer}
-                editingExpense={editingExpense}
-                onUpdateExpense={handleUpdateExpense}
-                token={token}
-                trackerId={trackerId}
-              />
-            </motion.div>
-          ) : activeTab === "dashboard" ? (
-            <motion.div
-              key="dashboard-view"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-6"
-            >
-              {/* Dynamic Timeframe Selector Bar */}
-              {expenses.length > 0 && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-stone-900 border border-stone-250/60 dark:border-stone-800 rounded-2xl p-4 shadow-xs transition-colors">
-                  <div>
-                    <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
-                      <Filter className="w-4 h-4 text-amber-500" />
-                      Dashboard Overview
-                    </h2>
-                    <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
-                      Statistics and balances for the selected period
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-[10px] font-extrabold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                      Period:
-                    </label>
-                    <select
-                      value={`${filterType}:${filterValue}`}
-                      onChange={(e) => {
-                        const [type, val] = e.target.value.split(":");
-                        setFilterType(type as "all" | "year" | "month");
-                        setFilterValue(val || "");
-                      }}
-                      className="bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-stone-400 dark:focus:border-stone-600 font-semibold cursor-pointer shadow-xs transition-colors hover:bg-stone-100 dark:hover:bg-stone-800"
-                    >
-                      <option value="all:">All Time</option>
-
-                      {uniqueYears.length > 0 && (
-                        <optgroup label="Years">
-                          {uniqueYears.map((yr) => (
-                            <option key={yr} value={`year:${yr}`}>{yr}</option>
-                          ))}
-                        </optgroup>
-                      )}
-
-                      {uniqueMonths.length > 0 && (
-                        <optgroup label="Months">
-                          {uniqueMonths.map((mo) => {
-                            const [yr, mn] = mo.split("-");
-                            const dateObj = new Date(Number(yr), Number(mn) - 1);
-                            const monthName = dateObj.toLocaleString("default", { month: "long" });
-                            return (
-                              <option key={mo} value={`month:${mo}`}>
-                                {monthName} {yr}
-                              </option>
-                            );
-                          })}
-                        </optgroup>
-                      )}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {/* Top summary stats dashboard */}
-              <DashboardStats
-                friends={friends}
-                expenses={filteredExpenses}
-                onQuickPayClick={handleQuickPay}
-              />
-
-              {/* Expense list below */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold font-display text-stone-500 dark:text-stone-400 uppercase tracking-widest">
-                    Gathering History
-                  </h3>
-                  {friends.length > 0 && expenses.length === 0 && (
-                    <button
-                      onClick={() => setIsAddingExpense(true)}
-                      className="text-stone-700 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Log First Meal
-                    </button>
-                  )}
-                </div>
-
-                <ExpenseList
-                  expenses={filteredExpenses}
+            {isAddingExpense ? (
+              <motion.div
+                key="expense-form-wrapper"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <ExpenseForm
                   friends={friends}
-                  onDeleteExpense={handleDeleteExpense}
-                  onEditExpense={handleEditExpense}
+                  onAddExpense={handleAddExpense}
+                  onCancel={() => {
+                    setIsAddingExpense(false);
+                    setPreselectedFormPayer(undefined);
+                    setEditingExpense(undefined);
+                  }}
+                  preselectedPayer={preselectedFormPayer}
+                  editingExpense={editingExpense}
+                  onUpdateExpense={handleUpdateExpense}
+                  token={token}
+                  trackerId={trackerId}
                 />
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="friends-view"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-            >
-              <FriendManager
-                friends={friends}
-                expenses={expenses}
-                onAddFriend={handleAddFriend}
-                onDeleteFriend={handleDeleteFriend}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            ) : activeTab === "dashboard" ? (
+              <motion.div
+                key="dashboard-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                {/* Dynamic Timeframe Selector Bar */}
+                {expenses.length > 0 && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-stone-900 border border-stone-250/60 dark:border-stone-800 rounded-2xl p-4 shadow-xs transition-colors">
+                    <div>
+                      <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
+                        <Filter className="w-4 h-4 text-amber-500" />
+                        Dashboard Overview
+                      </h2>
+                      <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
+                        Statistics and balances for the selected period
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] font-extrabold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+                        Period:
+                      </label>
+                      <select
+                        value={`${filterType}:${filterValue}`}
+                        onChange={(e) => {
+                          const [type, val] = e.target.value.split(":");
+                          setFilterType(type as "all" | "year" | "month");
+                          setFilterValue(val || "");
+                        }}
+                        className="bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-stone-400 dark:focus:border-stone-600 font-semibold cursor-pointer shadow-xs transition-colors hover:bg-stone-100 dark:hover:bg-stone-800"
+                      >
+                        <option value="all:">All Time</option>
+
+                        {uniqueYears.length > 0 && (
+                          <optgroup label="Years">
+                            {uniqueYears.map((yr) => (
+                              <option key={yr} value={`year:${yr}`}>{yr}</option>
+                            ))}
+                          </optgroup>
+                        )}
+
+                        {uniqueMonths.length > 0 && (
+                          <optgroup label="Months">
+                            {uniqueMonths.map((mo) => {
+                              const [yr, mn] = mo.split("-");
+                              const dateObj = new Date(Number(yr), Number(mn) - 1);
+                              const monthName = dateObj.toLocaleString("default", { month: "long" });
+                              return (
+                                <option key={mo} value={`month:${mo}`}>
+                                  {monthName} {yr}
+                                </option>
+                              );
+                            })}
+                          </optgroup>
+                        )}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Top summary stats dashboard */}
+                <DashboardStats
+                  friends={friends}
+                  expenses={filteredExpenses}
+                  onQuickPayClick={handleQuickPay}
+                />
+
+                {/* Expense list below */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold font-display text-stone-500 dark:text-stone-400 uppercase tracking-widest">
+                      Gathering History
+                    </h3>
+                    {friends.length > 0 && expenses.length === 0 && (
+                      <button
+                        onClick={() => setIsAddingExpense(true)}
+                        className="text-stone-700 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Log First Meal
+                      </button>
+                    )}
+                  </div>
+
+                  <ExpenseList
+                    expenses={filteredExpenses}
+                    friends={friends}
+                    onDeleteExpense={handleDeleteExpense}
+                    onEditExpense={handleEditExpense}
+                  />
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="friends-view"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <FriendManager
+                  friends={friends}
+                  expenses={expenses}
+                  onAddFriend={handleAddFriend}
+                  onDeleteFriend={handleDeleteFriend}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         )}
 
       </main>
@@ -1480,7 +1472,7 @@ export default function App() {
         <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row justify-center items-center gap-4">
           <div className="flex items-center gap-1.5 justify-center">
             <Smile className="w-4 h-4 text-amber-500" />
-            <span>Built with Gemini Flash 3.5 AI. Secure sandbox storage local persistence.</span>
+            <span>Built with AI 🤖.</span>
           </div>
         </div>
       </footer>
