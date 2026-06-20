@@ -4,7 +4,7 @@ import FriendManager from "./components/FriendManager";
 import ExpenseForm from "./components/ExpenseForm";
 import ExpenseList from "./components/ExpenseList";
 import DashboardStats from "./components/DashboardStats";
-import { Plus, Users, UtensilsCrossed, Sparkles, BookOpen, Smile, RefreshCw, Layers, Filter } from "lucide-react";
+import { Plus, Users, UtensilsCrossed, Sparkles, BookOpen, Smile, RefreshCw, Layers, Filter, Sun, Moon, Monitor, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 // Beautiful custom initial seed data
@@ -49,6 +49,11 @@ const SEED_EXPENSES: Expense[] = [
 ];
 
 export default function App() {
+  // Theme state
+  const [theme, setTheme] = useState<"light" | "dark" | "system">(() => {
+    return (localStorage.getItem("meal_tracker_theme") as "light" | "dark" | "system") || "system";
+  });
+
   // Authentication states
   const [token, setToken] = useState<string | null>(localStorage.getItem("meal_tracker_token"));
   const [user, setUser] = useState<any | null>(() => {
@@ -63,6 +68,20 @@ export default function App() {
   const [mockEmail, setMockEmail] = useState("");
   const [mockName, setMockName] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    if (!isProfileMenuOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest("#profile-dropdown-container")) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isProfileMenuOpen]);
 
   const [friends, setFriends] = useState<Friend[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -71,6 +90,42 @@ export default function App() {
   const [preselectedFormPayer, setPreselectedFormPayer] = useState<Friend | undefined>(undefined);
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Register Service Worker for PWA
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").then((reg) => {
+        console.log("ServiceWorker registered successfully scope: ", reg.scope);
+      }).catch((err) => {
+        console.error("ServiceWorker registration failed: ", err);
+      });
+    }
+  }, []);
+
+  // Theme Sync Engine
+  useEffect(() => {
+    localStorage.setItem("meal_tracker_theme", theme);
+    const root = window.document.documentElement;
+    
+    const applyTheme = () => {
+      root.classList.remove("light", "dark");
+      if (theme === "system") {
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        root.classList.add(systemDark ? "dark" : "light");
+      } else {
+        root.classList.add(theme);
+      }
+    };
+
+    applyTheme();
+
+    if (theme === "system") {
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      const listener = () => applyTheme();
+      media.addEventListener("change", listener);
+      return () => media.removeEventListener("change", listener);
+    }
+  }, [theme]);
 
   // Timeframe filtering states and derivations
   const [filterType, setFilterType] = useState<"all" | "year" | "month">("all");
@@ -501,7 +556,7 @@ export default function App() {
             </div>
           </div>
 
-          <div className="bg-stone-850/50 backdrop-blur-xl border border-stone-800 p-8 rounded-3xl shadow-2xl space-y-6">
+          <div className="bg-stone-900/50 backdrop-blur-xl border border-stone-800 p-8 rounded-3xl shadow-2xl space-y-6">
             {googleClientId ? (
               <div className="space-y-4 flex flex-col items-center">
                 <p className="text-xs font-semibold text-stone-400 uppercase tracking-wider">
@@ -570,7 +625,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setShowMockLogin(true)}
-                className="w-full bg-stone-800/40 hover:bg-stone-800 text-stone-300 hover:text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-colors cursor-pointer border border-stone-850"
+                className="w-full bg-stone-800/40 hover:bg-stone-800 text-stone-300 hover:text-white font-bold py-2.5 px-4 rounded-xl text-xs transition-colors cursor-pointer border border-stone-800"
               >
                 Show Developer Mock Login
               </button>
@@ -586,76 +641,51 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen pb-16 flex flex-col pt-1" id="applet-viewport">
+    <div className="min-h-screen pb-16 flex flex-col pt-1 bg-stone-50 dark:bg-stone-950 transition-colors" id="applet-viewport">
 
       {/* Top ambient notification of local timezone and details */}
-      <header className="border-b border-stone-200/60 bg-white shadow-xs sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 py-4 sm:px-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center shadow-md shadow-amber-500/10">
-              <UtensilsCrossed className="w-5 h-5" />
+      <header className="border-b border-stone-250/60 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-xs sticky top-0 z-50 transition-colors">
+        <div className="max-w-5xl mx-auto px-4 py-3 sm:py-4 sm:px-6 flex flex-wrap items-center justify-between gap-y-3 gap-x-2">
+          {/* Logo & branding */}
+          <div className="flex items-center gap-2.5 sm:gap-3 order-1">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center shadow-md shadow-amber-500/10 shrink-0">
+              <UtensilsCrossed className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h1 className="text-lg font-bold font-display tracking-tight text-stone-900 flex items-center gap-2">
+              <h1 className="text-base sm:text-lg font-bold font-display tracking-tight text-stone-900 dark:text-stone-50 flex items-center gap-1.5">
                 Meals Tracker
-                <span className="text-[10px] bg-amber-50 text-amber-700 border border-amber-100 font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider">
-                  AI-Powered
+                <span className="text-[9px] sm:text-[10px] bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 border border-amber-100 dark:border-amber-900/40 font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0">
+                  AI
                 </span>
               </h1>
-              <p className="text-[11px] text-stone-500">Group Dining Split & Caloric Ledger</p>
+              <p className="text-[10px] sm:text-[11px] text-stone-500 dark:text-stone-400 hidden sm:block">Group Dining Split & Caloric Ledger</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* User Profile and Share Controls */}
-            <div className="flex items-center gap-2 border-r border-stone-200 pr-3">
-              <img
-                src={user.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`}
-                alt={user.name}
-                className="w-8 h-8 rounded-full border border-stone-200 object-cover"
-              />
-              <div className="hidden md:block text-left">
-                <p className="text-xs font-bold text-stone-850">{user.name}</p>
-                <p className="text-[9px] text-stone-400 font-medium">{user.email}</p>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="text-[10px] text-stone-500 hover:text-stone-850 transition-colors uppercase font-extrabold tracking-wider ml-1 cursor-pointer"
-              >
-                Logout
-              </button>
-            </div>
-
-            <button
-              onClick={handleShareTracker}
-              className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-colors flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              <span>Share Tracker</span>
-            </button>
-
+          {/* Quick Controls Section */}
+          <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 order-3 w-full sm:w-auto sm:order-2 sm:ml-auto">
             {/* Quick-toggle tabs */}
-            <div className="bg-stone-100 p-1 rounded-xl flex items-center gap-1 font-semibold text-xs">
+            <div className="bg-stone-100 dark:bg-stone-800 p-1 rounded-xl flex items-center gap-1 font-semibold text-xs border border-stone-200/40 dark:border-stone-700/40 flex-1 sm:flex-initial">
               <button
                 onClick={() => {
                   setActiveTab("dashboard");
                   setIsAddingExpense(false);
                 }}
-                className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === "dashboard" && !isAddingExpense
-                    ? "bg-white text-stone-900 shadow-xs"
-                    : "text-stone-500 hover:text-stone-850"
+                className={`flex-1 sm:flex-initial text-center px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === "dashboard" && !isAddingExpense
+                    ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs"
+                    : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
                   }`}
               >
-                Let Ledger
+                Ledger
               </button>
               <button
                 onClick={() => {
                   setActiveTab("friends");
                   setIsAddingExpense(false);
                 }}
-                className={`px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === "friends" && !isAddingExpense
-                    ? "bg-white text-stone-900 shadow-xs"
-                    : "text-stone-500 hover:text-stone-850"
+                className={`flex-1 sm:flex-initial text-center px-3.5 py-1.5 rounded-lg transition-all cursor-pointer ${activeTab === "friends" && !isAddingExpense
+                    ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs"
+                    : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
                   }`}
               >
                 Friends ({friends.length})
@@ -669,13 +699,114 @@ export default function App() {
                   setPreselectedFormPayer(undefined);
                   setIsAddingExpense(true);
                 }}
-                className="bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold px-3.5 py-2 rounded-xl shadow-md cursor-pointer transition-colors flex items-center gap-1.5"
+                className="bg-stone-900 dark:bg-amber-500 hover:bg-stone-800 dark:hover:bg-amber-600 text-white dark:text-stone-950 text-xs font-semibold px-3.5 py-2 rounded-xl shadow-md cursor-pointer transition-colors flex items-center gap-1.5 shrink-0"
                 id="log-meal-header-btn"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Log Meal</span>
               </button>
             )}
+          </div>
+
+          <div id="profile-dropdown-container" className="relative flex items-center order-2 sm:order-3">
+            <button
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              className="focus:outline-hidden rounded-full transition-all duration-200 active:scale-95 flex items-center justify-center p-1.5 hover:bg-stone-100 dark:hover:bg-stone-800/60"
+              aria-label="Toggle profile menu"
+            >
+              <img
+                src={user.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`}
+                alt={user.name}
+                className="w-8 h-8 rounded-full border border-stone-200 dark:border-stone-700/80 object-cover"
+              />
+            </button>
+
+            <AnimatePresence>
+              {isProfileMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                  transition={{ duration: 0.15, ease: "easeOut" }}
+                  className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-stone-250/60 dark:border-stone-800 bg-white/95 dark:bg-stone-900/95 backdrop-blur-md shadow-xl p-4 z-50 text-left flex flex-col gap-3.5"
+                >
+                  <div className="px-1 py-0.5">
+                    <p className="text-xs font-bold text-stone-900 dark:text-stone-100">{user.name}</p>
+                    <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5 truncate">{user.email}</p>
+                  </div>
+
+                  <div className="h-px bg-stone-150 dark:bg-stone-800" />
+
+                  {/* Actions */}
+                  <button
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      handleShareTracker();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/20 active:bg-amber-100/60 transition-colors text-left cursor-pointer border border-transparent"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Share Tracker</span>
+                  </button>
+
+                  <div className="h-px bg-stone-150 dark:bg-stone-800" />
+
+                  {/* Theme switcher */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] text-stone-400 dark:text-stone-500 font-extrabold uppercase tracking-wider px-1">Appearance</span>
+                    <div className="bg-stone-100 dark:bg-stone-800 p-1 rounded-xl flex items-center gap-1 font-semibold text-xs border border-stone-200/40 dark:border-stone-700/40">
+                      <button
+                        onClick={() => setTheme("light")}
+                        className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex justify-center items-center gap-1.5 ${theme === "light"
+                            ? "bg-white dark:bg-stone-900 text-amber-500 shadow-xs"
+                            : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                          }`}
+                        title="Light Mode"
+                      >
+                        <Sun className="w-3.5 h-3.5" />
+                        <span className="text-[10px]">Light</span>
+                      </button>
+                      <button
+                        onClick={() => setTheme("dark")}
+                        className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex justify-center items-center gap-1.5 ${theme === "dark"
+                            ? "bg-white dark:bg-stone-900 text-indigo-400 shadow-xs"
+                            : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                          }`}
+                        title="Dark Mode"
+                      >
+                        <Moon className="w-3.5 h-3.5" />
+                        <span className="text-[10px]">Dark</span>
+                      </button>
+                      <button
+                        onClick={() => setTheme("system")}
+                        className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex justify-center items-center gap-1.5 ${theme === "system"
+                            ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-white shadow-xs"
+                            : "text-stone-500 hover:text-stone-900 dark:hover:text-stone-200"
+                          }`}
+                        title="System Mode"
+                      >
+                        <Monitor className="w-3.5 h-3.5" />
+                        <span className="text-[10px]">System</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-stone-150 dark:bg-stone-800" />
+
+                  {/* Logout Button */}
+                  <button
+                    onClick={() => {
+                      setIsProfileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 active:bg-red-100 transition-colors text-left cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Logout</span>
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </header>
@@ -735,18 +866,18 @@ export default function App() {
             >
               {/* Dynamic Timeframe Selector Bar */}
               {expenses.length > 0 && (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-stone-250/60 rounded-2xl p-4 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-stone-900 border border-stone-250/60 dark:border-stone-800 rounded-2xl p-4 shadow-xs transition-colors">
                   <div>
-                    <h2 className="text-sm font-bold text-stone-905 flex items-center gap-1.5">
+                    <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
                       <Filter className="w-4 h-4 text-amber-500" />
                       Dashboard Overview
                     </h2>
-                    <p className="text-[11px] text-stone-500 mt-0.5">
+                    <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-0.5">
                       Statistics and balances for the selected period
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <label className="text-[10px] font-extrabold text-stone-500 uppercase tracking-wider">
+                    <label className="text-[10px] font-extrabold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
                       Period:
                     </label>
                     <select
@@ -756,7 +887,7 @@ export default function App() {
                         setFilterType(type as "all" | "year" | "month");
                         setFilterValue(val || "");
                       }}
-                      className="bg-stone-50 border border-stone-200 text-stone-900 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-stone-400 font-semibold cursor-pointer shadow-xs transition-colors hover:bg-stone-100"
+                      className="bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 text-stone-900 dark:text-stone-100 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-stone-400 dark:focus:border-stone-600 font-semibold cursor-pointer shadow-xs transition-colors hover:bg-stone-100 dark:hover:bg-stone-800"
                     >
                       <option value="all:">All Time</option>
 
@@ -797,13 +928,13 @@ export default function App() {
               {/* Expense list below */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold font-display text-gray-500 uppercase tracking-widest">
+                  <h3 className="text-sm font-bold font-display text-stone-500 dark:text-stone-400 uppercase tracking-widest">
                     Gathering History
                   </h3>
                   {friends.length > 0 && expenses.length === 0 && (
                     <button
                       onClick={() => setIsAddingExpense(true)}
-                      className="text-stone-700 hover:text-stone-900 text-xs font-semibold flex items-center gap-1"
+                      className="text-stone-700 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-200 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" /> Log First Meal
                     </button>
@@ -839,20 +970,11 @@ export default function App() {
       </main>
 
       {/* Footer controls for development testing, seed reset, or credentials setup help */}
-      <footer className="mt-auto border-t border-stone-200/50 bg-stone-50 py-6 text-xs text-stone-500 text-center">
-        <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+      <footer className="mt-auto border-t border-stone-200/50 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/50 py-6 text-xs text-stone-500 dark:text-stone-450 text-center transition-colors">
+        <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row justify-center items-center gap-4">
+          <div className="flex items-center gap-1.5 justify-center">
             <Smile className="w-4 h-4 text-amber-500" />
             <span>Built with Gemini Flash 3.5 AI. Secure sandbox storage local persistence.</span>
-          </div>
-
-          <div className="flex flex-wrap gap-4 items-center justify-center font-semibold">
-            <button
-              onClick={handleResetData}
-              className="text-rose-600 hover:text-rose-800 transition-colors cursor-pointer"
-            >
-              Reset All
-            </button>
           </div>
         </div>
       </footer>

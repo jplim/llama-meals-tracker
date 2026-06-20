@@ -294,21 +294,21 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
-      className="bg-white border border-stone-200 rounded-3xl p-6 md:p-8 shadow-md"
+      className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 md:p-8 shadow-md transition-colors"
       id="expense-form-container"
     >
-      <div className="flex items-center justify-between border-b border-stone-100 pb-5 mb-6">
+      <div className="flex items-center justify-between border-b border-stone-100 dark:border-stone-800 pb-5 mb-6">
         <div>
-          <h2 className="text-xl md:text-2xl font-bold font-display text-stone-900">
+          <h2 className="text-xl md:text-2xl font-bold font-display text-stone-900 dark:text-stone-50">
             {editingExpense ? "Edit Group Meal" : "Log Group Meal"}
           </h2>
-          <p className="text-xs text-stone-500 mt-1">
+          <p className="text-xs text-stone-505 dark:text-stone-400 mt-1">
             Instantly capture billing info, auto-split tabs fairly, and estimate calories.
           </p>
         </div>
         <button
           onClick={onCancel}
-          className="text-sm font-semibold text-stone-500 hover:text-stone-800 px-3 py-1.5 rounded-lg hover:bg-stone-50 cursor-pointer"
+          className="text-sm font-semibold text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 px-3 py-1.5 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-800 cursor-pointer"
         >
           Back
         </button>
@@ -317,13 +317,13 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* Left Side: Receipt Scanning Options */}
-        <div className="lg:col-span-5 space-y-6 lg:border-r lg:border-stone-100 lg:pr-8" id="ai-photo-section">
+        <div className="lg:col-span-5 space-y-6 lg:border-r lg:border-stone-100 lg:dark:border-stone-800 lg:pr-8" id="ai-photo-section">
           <div className="space-y-2">
-            <h3 className="text-sm font-bold font-display text-stone-800 uppercase tracking-wider flex items-center gap-2">
+            <h3 className="text-sm font-bold font-display text-stone-800 dark:text-stone-200 uppercase tracking-wider flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-500" />
               Scan Receipt & Add Calories
             </h3>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-stone-500 dark:text-stone-400">
               Drag-and-drop your receipt image or enter a text description. Gemini AI will automate items parsing, prices matching, and nutrient diagnostics.
             </p>
           </div>
@@ -337,7 +337,7 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
             className={`cursor-pointer border-2 border-dashed rounded-2xl p-6 text-center transition-all duration-300 relative ${
               isDragOver
                 ? "border-amber-500 bg-amber-50/20"
-                : "border-stone-200 hover:border-stone-400 bg-stone-50/50"
+                : "border-stone-200 dark:border-stone-800 hover:border-stone-400 dark:hover:border-stone-700 bg-stone-50/50 dark:bg-stone-950/20"
             }`}
             id="drag-drop-zone"
           >
@@ -360,25 +360,25 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
                   alt="Receipt Preview"
                   className="max-h-40 mx-auto rounded-xl shadow-sm object-cover"
                 />
-                <p className="text-xs font-semibold text-stone-600 flex items-center justify-center gap-1.5">
+                <p className="text-xs font-semibold text-stone-600 dark:text-stone-405 flex items-center justify-center gap-1.5">
                   <FileText className="w-3.5 h-3.5 text-stone-400" /> Image uploaded successfully
                 </p>
-                <span className="text-[10px] text-amber-600 font-medium hover:underline">
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium hover:underline">
                   Click or Drop to replace
                 </span>
               </div>
             ) : (
               <div className="space-y-3" id="empty-image-state">
-                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm text-stone-500">
+                <div className="w-12 h-12 bg-white dark:bg-stone-800 rounded-full flex items-center justify-center mx-auto shadow-sm text-stone-500 dark:text-stone-400">
                   <Camera className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-stone-700">Drop your receipt photo here</p>
-                  <p className="text-[11px] text-stone-400 mt-1">Supports PNG, JPEG, WEBP and mobile crops</p>
+                  <p className="text-xs font-semibold text-stone-700 dark:text-stone-300">Drop your receipt photo here</p>
+                  <p className="text-[11px] text-stone-400 dark:text-stone-500 mt-1">Supports PNG, JPEG, WEBP and mobile crops</p>
                 </div>
                 <button
                   type="button"
-                  className="bg-white hover:bg-stone-100 text-stone-800 border border-stone-200 text-xs font-semibold py-1.5 px-3.5 rounded-lg shadow-sm cursor-pointer transition-colors"
+                  className="bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200 border border-stone-200 dark:border-stone-800 text-xs font-semibold py-1.5 px-3.5 rounded-lg shadow-sm cursor-pointer transition-colors"
                 >
                   Browse Files
                 </button>
@@ -390,10 +390,10 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
           <div className="space-y-3 pt-2" id="text-desc-section">
             <div className="relative">
               <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                <div className="w-full border-t border-stone-150" />
+                <div className="w-full border-t border-stone-150 dark:border-stone-800" />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-white px-3 font-semibold text-stone-400 uppercase tracking-widest text-[9px]">
+                <span className="bg-white dark:bg-stone-900 px-3 font-semibold text-stone-400 dark:text-stone-500 uppercase tracking-widest text-[9px]">
                   OR describe the meal
                 </span>
               </div>
@@ -405,21 +405,21 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
                 onChange={(e) => setPromptText(e.target.value)}
                 placeholder="Example: We ate at Taco Bell, I ordered one Beef Quesarito for RM6.50, and Jane had a Crunchwrap Supreme for RM7.00. Estimating to add up around 1100 total kcal."
                 rows={3}
-                className="w-full bg-stone-50 text-stone-950 border border-stone-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-stone-400 text-xs transition-colors"
+                className="w-full bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 outline-none focus:bg-white dark:focus:bg-stone-950 focus:border-stone-400 dark:focus:border-stone-600 text-xs transition-colors"
               />
 
               <div className="flex flex-wrap gap-1.5 justify-start">
                 <button
                   type="button"
                   onClick={() => tryDemoMock("Starbucks Breakfast: 2 Caffè Lattes (RM4.50 each) and 2 Butter Croissants (RM3.75 each)")}
-                  className="text-[10px] border border-stone-200 hover:border-stone-300 rounded-full px-2.5 py-1 text-stone-600 bg-stone-50 cursor-pointer"
+                  className="text-[10px] border border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700 rounded-full px-2.5 py-1 text-stone-600 dark:text-stone-300 bg-stone-50 dark:bg-stone-950/40 cursor-pointer"
                 >
                   ☕ Preset: Cafe Breakfast
                 </button>
                 <button
                   type="button"
                   onClick={() => tryDemoMock("Lunch at Sweetgreen: 2 Harvest Bowls (RM14.25 each) and a Hibiscus Tea (RM3.50)")}
-                  className="text-[10px] border border-stone-200 hover:border-stone-300 rounded-full px-2.5 py-1 text-stone-600 bg-stone-50 cursor-pointer"
+                  className="text-[10px] border border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700 rounded-full px-2.5 py-1 text-stone-600 dark:text-stone-300 bg-stone-50 dark:bg-stone-950/40 cursor-pointer"
                 >
                   🥗 Preset: Sweetgreen Lunch
                 </button>
@@ -429,7 +429,7 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
                 type="button"
                 onClick={scanReceiptText}
                 disabled={isScanning || !promptText.trim()}
-                className="w-full bg-stone-100 hover:bg-stone-200 disabled:opacity-50 disabled:hover:bg-stone-100 text-stone-850 font-semibold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                className="w-full bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 disabled:opacity-50 disabled:hover:bg-stone-100 text-stone-800 dark:text-stone-200 font-semibold py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 {isScanning && aiAnalysisMethod === "text" ? (
                   <>
@@ -481,13 +481,13 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
         {/* Right Side: Ledger Form Fields */}
         <div className="lg:col-span-7">
           <form onSubmit={handleSubmit} className="space-y-6" id="bill-details-form">
-            <h3 className="text-sm font-bold font-display text-stone-800 uppercase tracking-wider">
+            <h3 className="text-sm font-bold font-display text-stone-800 dark:text-stone-200 uppercase tracking-wider">
               Meal Details & Splitting
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider block">
+                <label className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider block">
                   Meal Title / Restaurant
                 </label>
                 <input
@@ -495,20 +495,20 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Olive Garden Feast"
-                  className="w-full bg-stone-50 text-stone-900 border border-stone-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-stone-400 text-sm transition-all"
+                  className="w-full bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 outline-none focus:bg-white dark:focus:bg-stone-950 focus:border-stone-400 dark:focus:border-stone-600 text-sm transition-all"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider block">
+                <label className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider block">
                   Meal Date
                 </label>
                 <input
                   type="date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-stone-50 text-stone-900 border border-stone-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-stone-400 text-sm transition-all"
+                  className="w-full bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 outline-none focus:bg-white dark:focus:bg-stone-950 focus:border-stone-400 dark:focus:border-stone-600 text-sm transition-all"
                   required
                 />
               </div>
@@ -516,14 +516,14 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider block">
+                <label className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider block">
                   Who paid the bill?
                 </label>
                 <select
                   id="payer-select"
                   value={paidById}
                   onChange={(e) => setPaidById(e.target.value)}
-                  className="w-full bg-stone-50 text-stone-900 border border-stone-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-stone-400 text-sm cursor-pointer transition-all"
+                  className="w-full bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 outline-none focus:bg-white dark:focus:bg-stone-950 focus:border-stone-400 dark:focus:border-stone-600 text-sm cursor-pointer transition-all"
                   required
                 >
                   <option value="" disabled>Select payer...</option>
@@ -536,11 +536,11 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider block">
+                <label className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider block">
                   Total Billing Amount (RM)
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-stone-400 text-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-stone-400 dark:text-stone-500 text-sm">
                     RM
                   </div>
                   <input
@@ -554,7 +554,7 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
                       const val = e.target.value;
                       setAmount(val === "" ? "" : Number(val));
                     }}
-                    className="w-full bg-stone-50 text-stone-900 border border-stone-200 rounded-xl pl-10 pr-3 py-2.5 outline-none focus:bg-white focus:border-stone-400 text-sm font-mono transition-all"
+                    className="w-full bg-stone-50 dark:bg-stone-900 text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-800 rounded-xl pl-10 pr-3 py-2.5 outline-none focus:bg-white dark:focus:bg-stone-950 focus:border-stone-400 dark:focus:border-stone-600 text-sm font-mono transition-all"
                     required
                   />
                 </div>
@@ -564,22 +564,22 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
             {/* Friends who shared the meal */}
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-stone-500 uppercase tracking-wider block flex items-center gap-1.5">
-                  <UserCheck className="w-3.5 h-3.5 text-stone-400" /> Shared splits (who participants in eating)
+                <label className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider block flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-stone-400 dark:text-stone-500" /> Shared splits (who participants in eating)
                 </label>
                 <div className="space-x-2">
                   <button
                     type="button"
                     onClick={selectAllParticipants}
-                    className="text-[10px] uppercase tracking-wider font-extrabold text-stone-500 hover:text-stone-800 transition-colors"
+                    className="text-[10px] uppercase tracking-wider font-extrabold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 transition-colors"
                   >
                     Select All
                   </button>
-                  <span className="text-stone-300">/</span>
+                  <span className="text-stone-300 dark:text-stone-700">/</span>
                   <button
                     type="button"
                     onClick={selectNoneParticipants}
-                    className="text-[10px] uppercase tracking-wider font-extrabold text-stone-500 hover:text-stone-800 transition-colors"
+                    className="text-[10px] uppercase tracking-wider font-extrabold text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 transition-colors"
                   >
                     Clear All
                   </button>
@@ -596,8 +596,8 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
                       onClick={() => toggleParticipant(friend.id)}
                       className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border cursor-pointer select-none transition-all duration-200 ${
                         isChecked
-                          ? "bg-stone-900 text-stone-50 border-stone-900 shadow-sm"
-                          : "bg-stone-50 text-stone-600 border-stone-200 hover:border-stone-300"
+                          ? "bg-stone-900 dark:bg-stone-100 text-stone-50 dark:text-stone-950 border-stone-900 dark:border-stone-100 shadow-sm"
+                          : "bg-stone-50 dark:bg-stone-950/40 text-stone-600 dark:text-stone-300 border-stone-200 dark:border-stone-800 hover:border-stone-300 dark:hover:border-stone-700"
                       }`}
                     >
                       <div
@@ -654,14 +654,14 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
                   {items.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center gap-2 p-2.5 bg-stone-50 border border-stone-150 rounded-xl text-xs"
+                      className="flex items-center gap-2 p-2.5 bg-stone-50 dark:bg-stone-900/60 border border-stone-150 dark:border-stone-800/80 rounded-xl text-xs transition-colors"
                     >
                       <input
                         type="text"
                         placeholder="e.g. Caesar Salad"
                         value={item.name}
                         onChange={(e) => handleUpdateItem(item.id, "name", e.target.value)}
-                        className="flex-1 bg-white font-medium text-stone-900 border border-stone-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-stone-400"
+                        className="flex-1 bg-white dark:bg-stone-900 font-medium text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-800 rounded-lg px-2.5 py-1.5 outline-none focus:border-stone-400 dark:focus:border-stone-600 focus:bg-white dark:focus:bg-stone-950"
                         required
                       />
 
@@ -675,7 +675,7 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
                           placeholder="Price"
                           value={item.price ?? ""}
                           onChange={(e) => handleUpdateItem(item.id, "price", e.target.value === "" ? 0 : Number(e.target.value))}
-                          className="w-full bg-white font-mono text-stone-900 border border-stone-200 rounded-lg pl-7 pr-1.5 py-1.5 outline-none focus:border-stone-400 text-right"
+                          className="w-full bg-white dark:bg-stone-900 font-mono text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-800 rounded-lg pl-7 pr-1.5 py-1.5 outline-none focus:border-stone-400 dark:focus:border-stone-600 focus:bg-white dark:focus:bg-stone-950 text-right"
                           required
                         />
                       </div>
@@ -686,7 +686,7 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
                           placeholder="kcal"
                           value={item.estimatedCalories ?? ""}
                           onChange={(e) => handleUpdateItem(item.id, "estimatedCalories", e.target.value === "" ? 0 : Number(e.target.value))}
-                          className="w-full bg-white font-mono text-stone-900 border border-stone-200 rounded-lg pr-7 pl-1.5 py-1.5 outline-none focus:border-stone-400 text-right"
+                          className="w-full bg-white dark:bg-stone-900 font-mono text-stone-900 dark:text-stone-100 border border-stone-200 dark:border-stone-800 rounded-lg pr-7 pl-1.5 py-1.5 outline-none focus:border-stone-400 dark:focus:border-stone-600 focus:bg-white dark:focus:bg-stone-950 text-right"
                         />
                         <span className="absolute inset-y-0 right-0 pr-2 flex items-center text-[10px] text-orange-500/80 font-bold pointer-events-none">
                           <Flame className="w-3 h-3" />
@@ -727,7 +727,7 @@ export default function ExpenseForm({ friends, onAddExpense, onCancel, preselect
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Write any custom details (e.g., Alice left early or split was offset)"
                 rows={2}
-                className="w-full bg-stone-50 text-stone-950 border border-stone-200 rounded-xl px-3 py-2.5 outline-none focus:bg-white focus:border-stone-400 text-xs transition-colors"
+                className="w-full bg-stone-50 dark:bg-stone-900 text-stone-950 dark:text-stone-100 border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 outline-none focus:bg-white dark:focus:bg-stone-950 focus:border-stone-400 dark:focus:border-stone-600 text-xs transition-colors"
               />
             </div>
 

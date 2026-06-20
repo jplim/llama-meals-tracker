@@ -53,14 +53,14 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
     <div className="space-y-4" id="expense-list-root">
       
       {/* Header and Filter panel */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
-        <h3 className="text-base font-bold font-display text-stone-900 flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-stone-600" />
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-4 shadow-xs transition-colors">
+        <h3 className="text-base font-bold font-display text-stone-900 dark:text-stone-100 flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-stone-600 dark:text-stone-400" />
           Dining Ledger ({filteredExpenses.length} meals)
         </h3>
 
         <div className="relative flex-1 sm:max-w-xs">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-stone-400">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-stone-400 dark:text-stone-500">
             <Search className="w-4 h-4" />
           </div>
           <input
@@ -68,19 +68,19 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search restaurant, host..."
-            className="w-full bg-stone-50 border border-stone-200 rounded-xl pl-9 pr-4 py-1.5 text-xs outline-none focus:bg-white focus:border-stone-400 text-stone-900 transition-colors"
+            className="w-full bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl pl-9 pr-4 py-1.5 text-xs outline-none focus:bg-white dark:focus:bg-stone-950 focus:border-stone-400 dark:focus:border-stone-600 text-stone-900 dark:text-stone-100 transition-colors"
           />
         </div>
       </div>
 
       {/* Render Ledger */}
       {filteredExpenses.length === 0 ? (
-        <div className="bg-white border border-stone-200 rounded-2xl p-12 text-center space-y-3" id="empty-ledger-view">
-          <Clock className="w-10 h-10 text-stone-300 mx-auto" />
-          <p className="text-stone-500 text-sm font-medium">
+        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl p-12 text-center space-y-3 transition-colors" id="empty-ledger-view">
+          <Clock className="w-10 h-10 text-stone-300 dark:text-stone-700 mx-auto" />
+          <p className="text-stone-500 dark:text-stone-400 text-sm font-medium">
             {expenses.length === 0 ? "No meals recorded for this period." : "No matching meals found."}
           </p>
-          <p className="text-xs text-stone-400 max-w-xs mx-auto">
+          <p className="text-xs text-stone-400 dark:text-stone-500 max-w-xs mx-auto">
             {expenses.length === 0 
               ? "Change your period filter or log a new meal to see stats for this timeframe." 
               : "Try altering your search keywords or period filters."}
@@ -100,7 +100,7 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm hover:border-stone-300 transition-colors"
+                  className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl overflow-hidden shadow-xs hover:border-stone-300 dark:hover:border-stone-700 transition-colors"
                   id={`expense-card-${expense.id}`}
                 >
                   {/* Card visible summary bar */}
@@ -111,23 +111,23 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
                     <div className="flex items-center gap-3.5 min-w-0">
                       {/* Avatar of Payer */}
                       <div
-                        className="w-10 h-10 rounded-xl flex flex-col items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm"
+                        className="w-10 h-10 rounded-xl flex flex-col items-center justify-center text-white font-bold text-sm shrink-0 shadow-xs"
                         style={{ backgroundColor: getFriendColor(expense.paidById) }}
                       >
                         {getFriendName(expense.paidById).charAt(0).toUpperCase()}
                       </div>
 
                       <div className="min-w-0">
-                        <h4 className="font-bold text-stone-900 text-sm md:text-base leading-tight truncate">
+                        <h4 className="font-bold text-stone-900 dark:text-stone-100 text-sm md:text-base leading-tight truncate">
                           {expense.title}
                         </h4>
-                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-stone-500 mt-1">
-                          <span className="font-mono bg-stone-100 px-2 py-0.5 rounded text-[10px]">
+                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-stone-500 dark:text-stone-400 mt-1">
+                          <span className="font-mono bg-stone-100 dark:bg-stone-800 px-2 py-0.5 rounded text-[10px]">
                             {expense.date}
                           </span>
                           <span className="flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
-                            Paid by <strong className="text-stone-700">{getFriendName(expense.paidById)}</strong>
+                            <span className="w-1.5 h-1.5 rounded-full bg-stone-400 dark:bg-stone-600" />
+                            Paid by <strong className="text-stone-700 dark:text-stone-300">{getFriendName(expense.paidById)}</strong>
                           </span>
                         </div>
                       </div>
@@ -135,18 +135,18 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
 
                     <div className="flex items-center gap-4 shrink-0">
                       <div className="text-right">
-                        <div className="text-base md:text-lg font-bold font-mono text-stone-900">
+                        <div className="text-base md:text-lg font-bold font-mono text-stone-900 dark:text-stone-50">
                           RM{expense.amount.toFixed(2)}
                         </div>
                         {expense.estimatedCalories > 0 && (
-                          <div className="text-[10px] text-orange-650 font-bold flex items-center gap-0.5 justify-end mt-0.5">
+                          <div className="text-[10px] text-orange-600 dark:text-orange-400 font-bold flex items-center gap-0.5 justify-end mt-0.5">
                             <Flame className="w-3 h-3 text-orange-500" />
                             {expense.estimatedCalories} kcal
                           </div>
                         )}
                       </div>
 
-                      <div className="text-stone-400 hover:text-stone-700 transition-colors">
+                      <div className="text-stone-400 dark:text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 transition-colors">
                         {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                       </div>
                     </div>
@@ -159,34 +159,34 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="border-t border-stone-100 bg-stone-50/40"
+                        className="border-t border-stone-100 dark:border-stone-800 bg-stone-50/40 dark:bg-stone-950/20 transition-colors"
                       >
-                        <div className="p-5 space-y-5 text-xs text-stone-700">
+                        <div className="p-5 space-y-5 text-xs text-stone-700 dark:text-stone-300">
                           
                           {/* Split layout block */}
-                          <div className="bg-white border border-stone-200/60 rounded-xl p-4 space-y-3.5">
-                            <div className="flex justify-between items-center pb-2 border-b border-stone-100 font-medium">
-                              <span className="text-stone-500">Split Share Details</span>
-                              <span className="text-stone-850 font-mono font-bold">
+                          <div className="bg-white dark:bg-stone-900 border border-stone-200/60 dark:border-stone-800 rounded-xl p-4 space-y-3.5 transition-colors">
+                            <div className="flex justify-between items-center pb-2 border-b border-stone-100 dark:border-stone-800 font-medium">
+                              <span className="text-stone-500 dark:text-stone-400">Split Share Details</span>
+                              <span className="text-stone-800 dark:text-stone-200 font-mono font-bold">
                                 RM{splitShareAmount.toFixed(2)} each
                               </span>
                             </div>
 
                             <div className="space-y-1.5">
-                              <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold block">
+                              <span className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500 font-bold block">
                                 Eaten by ({expense.participants?.length || 0}):
                               </span>
                               <div className="flex flex-wrap gap-2">
                                 {expense.participants?.map((pId) => (
                                   <div
                                     key={pId}
-                                    className="inline-flex items-center gap-1.5 bg-stone-50 border border-stone-200 rounded-full px-2.5 py-1 text-[11px]"
+                                    className="inline-flex items-center gap-1.5 bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-full px-2.5 py-1 text-[11px] transition-colors"
                                   >
                                     <div
                                       className="w-2 h-2 rounded-full"
                                       style={{ backgroundColor: getFriendColor(pId) }}
                                     />
-                                    <span className="font-medium text-stone-700">{getFriendName(pId)}</span>
+                                    <span className="font-medium text-stone-700 dark:text-stone-300">{getFriendName(pId)}</span>
                                   </div>
                                 ))}
                               </div>
@@ -196,32 +196,32 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
                           {/* Items and estimates */}
                           {expense.items && expense.items.length > 0 && (
                             <div className="space-y-2">
-                              <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold block">
+                              <span className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500 font-bold block">
                                 Dish Breakdown & Nutrition Analysis:
                               </span>
-                              <div className="bg-white border border-stone-150 rounded-xl overflow-hidden divide-y divide-stone-100">
+                              <div className="bg-white dark:bg-stone-900 border border-stone-150 dark:border-stone-800 rounded-xl overflow-hidden divide-y divide-stone-100 dark:divide-stone-800 transition-colors">
                                 {expense.items.map((it) => (
                                   <div key={it.id} className="p-2.5 flex items-center justify-between text-xs">
-                                    <span className="font-semibold text-stone-850">{it.name}</span>
-                                    <div className="flex items-center gap-4 text-stone-500 font-mono">
+                                    <span className="font-semibold text-stone-800 dark:text-stone-200">{it.name}</span>
+                                    <div className="flex items-center gap-4 text-stone-500 dark:text-stone-400 font-mono">
                                       {it.estimatedCalories > 0 && (
-                                        <span className="text-orange-700/90 font-bold flex items-center gap-0.5">
-                                          <Flame className="w-3 h-3 text-orange-400 fill-orange-100" />
+                                        <span className="text-orange-700/90 dark:text-orange-400/90 font-bold flex items-center gap-0.5">
+                                          <Flame className="w-3 h-3 text-orange-400 dark:text-orange-500/70 fill-orange-100 dark:fill-orange-950/20" />
                                           {it.estimatedCalories} kcal
                                         </span>
                                       )}
-                                      <span className="text-stone-700 font-bold">RM{it.price.toFixed(2)}</span>
+                                      <span className="text-stone-700 dark:text-stone-300 font-bold">RM{it.price.toFixed(2)}</span>
                                     </div>
                                   </div>
                                 ))}
 
                                 {expense.estimatedCalories > 0 && (
-                                  <div className="p-2.5 bg-orange-50/40 flex justify-between items-center font-bold text-stone-850">
-                                    <span className="flex items-center gap-1 text-orange-800">
-                                      <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-100 animate-pulse" />
+                                  <div className="p-2.5 bg-orange-50/40 dark:bg-orange-950/20 flex justify-between items-center font-bold text-stone-800 dark:text-stone-200 transition-colors">
+                                    <span className="flex items-center gap-1 text-orange-800 dark:text-orange-400">
+                                      <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-100 dark:fill-orange-950/30 animate-pulse" />
                                       AI Estimated Calories (Portions Sum)
                                     </span>
-                                    <span className="font-mono text-orange-850">{expense.estimatedCalories} kcal</span>
+                                    <span className="font-mono text-orange-800 dark:text-orange-200">{expense.estimatedCalories} kcal</span>
                                   </div>
                                 )}
                               </div>
@@ -233,10 +233,10 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {expense.notes && (
                                 <div className="space-y-1.5">
-                                  <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold block">
+                                  <span className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500 font-bold block">
                                     Notes
                                   </span>
-                                  <div className="bg-stone-50 border border-stone-200 rounded-xl p-3 text-stone-600 leading-relaxed italic">
+                                  <div className="bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-3 text-stone-600 dark:text-stone-300 leading-relaxed italic transition-colors">
                                     "{expense.notes}"
                                   </div>
                                 </div>
@@ -244,10 +244,10 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
 
                               {expense.receiptImage && (
                                 <div className="space-y-1.5">
-                                  <span className="text-[10px] uppercase tracking-wider text-stone-400 font-bold block">
+                                  <span className="text-[10px] uppercase tracking-wider text-stone-400 dark:text-stone-500 font-bold block">
                                     Scanned Receipt Image
                                   </span>
-                                  <div className="inline-block bg-white border border-stone-200 rounded-xl p-2 max-w-xs shadow-xs">
+                                  <div className="inline-block bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-2 max-w-xs shadow-xs transition-colors">
                                     <img
                                       src={expense.receiptImage}
                                       alt="Scanned Receipt Thumbnail"
@@ -260,8 +260,8 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
                           )}
 
                           {/* Delete/Edit transaction row */}
-                          <div className="flex justify-between items-center pt-2 border-t border-stone-100">
-                            <span className="text-[10px] text-stone-400 font-mono">
+                          <div className="flex justify-between items-center pt-2 border-t border-stone-100 dark:border-stone-800 transition-colors">
+                            <span className="text-[10px] text-stone-400 dark:text-stone-550 font-mono">
                               ID: {expense.id.slice(0, 8)}...
                             </span>
                             <div className="flex gap-2">
@@ -270,7 +270,7 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
                                   e.stopPropagation();
                                   onEditExpense(expense);
                                 }}
-                                className="text-stone-500 hover:text-amber-600 font-bold flex items-center gap-1 py-1 px-2.5 rounded-lg hover:bg-amber-50 transition-colors cursor-pointer"
+                                className="text-stone-500 dark:text-stone-450 hover:text-amber-600 dark:hover:text-amber-500 font-bold flex items-center gap-1 py-1 px-2.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/20 transition-colors cursor-pointer"
                               >
                                 <Edit className="w-3.5 h-3.5" />
                                 Edit Record
@@ -282,7 +282,7 @@ export default function ExpenseList({ expenses, friends, onDeleteExpense, onEdit
                                     onDeleteExpense(expense.id);
                                   }
                                 }}
-                                className="text-stone-400 hover:text-rose-600 font-bold flex items-center gap-1 py-1 px-2.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                                className="text-stone-400 dark:text-stone-500 hover:text-rose-600 dark:hover:text-rose-500 font-bold flex items-center gap-1 py-1 px-2.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 Remove Meal Record

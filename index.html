@@ -3,8 +3,29 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Meals Tracker</title>
+  
+  <!-- PWA & Mobile Web App settings -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#f59e0b" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <script>
+    try {
+      const theme = localStorage.getItem("meal_tracker_theme") || "system";
+      const root = document.documentElement;
+      root.classList.remove("light", "dark");
+      if (theme === "system") {
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        root.classList.add(systemDark ? "dark" : "light");
+      } else {
+        root.classList.add(theme);
+      }
+    } catch (e) {}
+  </script>
 </head>
 
 <body>
