@@ -1,16 +1,23 @@
 {
   "id": "/",
   "name": "Meals Tracker",
-  "short_name": "Meals",
+  "short_name": "Meals Tracker",
   "description": "Collaborative group dining split ledger and calorie tracker.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "background_color": "#1c1917",
   "theme_color": "#f59e0b",
   "orientation": "portrait-primary",
-  "categories": ["food", "finance", "lifestyle"],
+  "categories": [
+    "food",
+    "finance",
+    "lifestyle"
+  ],
   "lang": "en",
   "icons": [
     {
@@ -44,7 +51,12 @@
       "short_name": "Log Meal",
       "description": "Quickly log a new group meal expense",
       "url": "/?action=log",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
