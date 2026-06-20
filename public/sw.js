@@ -1,75 +1,69 @@
-const CACHE_NAME = 'meals-tracker-cache-v1';
-const ASSETS = [
+const CACHE_VERSION = 'v3';
+const CACHE_NAME = `meals-tracker-${CACHE_VERSION}`;
+
+const PRECACHE_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon-maskable-512.png',
+  '/apple-touch-icon.png',
 ];
 
-// On install, pre-cache core assets
+// Install: pre-cache core shell assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_ASSETS))
   );
   self.skipWaiting();
 });
 
-// On activate, clean up old caches
+// Activate: clean up old version caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
-        })
-      );
-    })
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    )
   );
   self.clients.claim();
 });
 
-// Dynamic resource fetch requests interceptor
+// Fetch: Network-first for API, Stale-While-Revalidate for static assets
 self.addEventListener('fetch', (event) => {
-  // Avoid caching non-GET requests or backend api requests
-  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
+  const { request } = event;
+
+  // Never intercept non-GET or API requests — always go to network
+  if (request.method !== 'GET' || request.url.includes('/api/')) {
     return;
   }
 
+  // For navigation requests (HTML pages), use network-first with cache fallback
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((res) => {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(request, clone));
+          return res;
+        })
+        .catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
+
+  // For static assets: Stale-While-Revalidate
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Fetch new version in background (Stale-While-Revalidate)
-        fetch(event.request).then((networkResponse) => {
-          if (networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, networkResponse);
-            });
-          }
-        }).catch(() => {/* Ignore network error in background */});
-        
-        return cachedResponse;
-      }
-
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+    caches.match(request).then((cached) => {
+      const networkFetch = fetch(request).then((networkRes) => {
+        if (networkRes.status === 200) {
+          const clone = networkRes.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(request, clone));
         }
+        return networkRes;
+      }).catch(() => null);
 
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return networkResponse;
-      }).catch(() => {
-        // Return index.html for navigation requests offline
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-      });
+      return cached || networkFetch;
     })
   );
 });

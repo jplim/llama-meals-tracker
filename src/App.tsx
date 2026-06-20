@@ -4,7 +4,7 @@ import FriendManager from "./components/FriendManager";
 import ExpenseForm from "./components/ExpenseForm";
 import ExpenseList from "./components/ExpenseList";
 import DashboardStats from "./components/DashboardStats";
-import { Plus, UtensilsCrossed, Sparkles, Smile, RefreshCw, Filter, Sun, Moon, Monitor, LogOut, Share2, Trash2, Check, Link, Mail, FolderOpen, PlusCircle, X } from "lucide-react";
+import { Plus, Sparkles, Smile, RefreshCw, Filter, Sun, Moon, Monitor, LogOut, Share2, Trash2, Check, Link, Mail, FolderOpen, PlusCircle, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 // Beautiful custom initial seed data
@@ -112,15 +112,47 @@ export default function App() {
   const [editingExpense, setEditingExpense] = useState<Expense | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Register Service Worker for PWA
+  // PWA install prompt
+  const deferredInstallPrompt = useRef<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isInstallingPWA, setIsInstallingPWA] = useState(false);
+  // iOS detection (Safari doesn't fire beforeinstallprompt — needs manual guidance)
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !(window as any).MSStream;
+  const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+
+  // Register Service Worker + capture install prompt
   useEffect(() => {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").then((reg) => {
-        console.log("ServiceWorker registered successfully scope: ", reg.scope);
+        console.log("ServiceWorker registered scope:", reg.scope);
       }).catch((err) => {
-        console.error("ServiceWorker registration failed: ", err);
+        console.error("ServiceWorker registration failed:", err);
       });
     }
+
+    // Android/Chrome: capture native install prompt
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      deferredInstallPrompt.current = e;
+      // Show banner after a short delay so the user has seen the app first
+      if (!isInStandaloneMode && !localStorage.getItem("pwa_install_dismissed")) {
+        setTimeout(() => setShowInstallBanner(true), 3000);
+      }
+    };
+
+    // iOS: show manual install hint after first visit
+    if (isIOS && !isInStandaloneMode && !localStorage.getItem("pwa_install_dismissed")) {
+      setTimeout(() => setShowInstallBanner(true), 3000);
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+    window.addEventListener("appinstalled", () => {
+      setShowInstallBanner(false);
+      deferredInstallPrompt.current = null;
+      localStorage.setItem("pwa_install_dismissed", "1");
+    });
+
+    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
   }, []);
 
   // Theme Sync Engine
@@ -719,8 +751,8 @@ export default function App() {
 
         <div className="max-w-md w-full text-center space-y-8 z-10">
           <div className="space-y-4">
-            <div className="w-16 h-16 bg-gradient-to-tr from-amber-500 to-orange-500 rounded-3xl flex items-center justify-center shadow-lg shadow-amber-500/25 mx-auto">
-              <UtensilsCrossed className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 rounded-3xl overflow-hidden shadow-lg shadow-amber-500/25 mx-auto">
+              <img src="/icon-192.png" alt="Meals Tracker" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="text-3xl font-extrabold tracking-tight font-display bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent">
@@ -992,8 +1024,8 @@ export default function App() {
         <div className="max-w-5xl mx-auto px-4 py-3 sm:py-4 sm:px-6 flex flex-wrap items-center justify-between gap-y-3 gap-x-2">
           {/* Logo & branding */}
           <div className="flex items-center gap-2.5 sm:gap-3 order-1">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center shadow-md shadow-amber-500/10 shrink-0">
-              <UtensilsCrossed className="w-4.5 h-4.5 sm:w-5 sm:h-5" />
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl overflow-hidden shadow-md shadow-amber-500/10 shrink-0">
+              <img src="/icon-192.png" alt="Meals Tracker" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="text-base sm:text-lg font-bold font-display tracking-tight text-stone-900 dark:text-stone-50 flex items-center gap-1.5">
@@ -1215,6 +1247,36 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Install App (only shown if not already installed) */}
+                  {!isInStandaloneMode && (
+                    <>
+                      <div className="h-px bg-stone-150 dark:bg-stone-800 mx-1" />
+                      <div className="px-3 pt-2 pb-1">
+                        <button
+                          onClick={() => {
+                            setIsProfileMenuOpen(false);
+                            if (deferredInstallPrompt.current) {
+                              deferredInstallPrompt.current.prompt();
+                              deferredInstallPrompt.current.userChoice.then((choice: any) => {
+                                if (choice.outcome === "accepted") {
+                                  localStorage.setItem("pwa_install_dismissed", "1");
+                                  setShowInstallBanner(false);
+                                }
+                                deferredInstallPrompt.current = null;
+                              });
+                            } else {
+                              setShowInstallBanner(true);
+                            }
+                          }}
+                          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20 active:bg-amber-100 transition-colors text-left cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Install App</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+
                   <div className="h-px bg-stone-150 dark:bg-stone-800 mx-1" />
 
                   {/* Logout Button */}
@@ -1430,6 +1492,69 @@ export default function App() {
           <span>{toast}</span>
         </div>
       )}
+
+      {/* PWA Install Banner */}
+      <AnimatePresence>
+        {showInstallBanner && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
+            className="fixed bottom-4 left-4 right-4 z-[200] max-w-sm mx-auto"
+          >
+            <div className="bg-stone-900 dark:bg-stone-800 border border-stone-700/60 rounded-2xl shadow-2xl shadow-black/40 p-4 flex items-center gap-3">
+              <img
+                src="/icon-192.png"
+                alt="Meals Tracker"
+                className="w-12 h-12 rounded-xl shrink-0 border border-stone-700/40"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-bold text-sm leading-tight">Add to Home Screen</p>
+                {isIOS ? (
+                  <p className="text-stone-400 text-[11px] mt-0.5 leading-snug">
+                    Tap <strong className="text-stone-300">Share ⧆</strong> then <strong className="text-stone-300">Add to Home Screen</strong>
+                  </p>
+                ) : (
+                  <p className="text-stone-400 text-[11px] mt-0.5">Install for a faster, app-like experience</p>
+                )}
+              </div>
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                {!isIOS && (
+                  <button
+                    onClick={async () => {
+                      if (!deferredInstallPrompt.current) return;
+                      setIsInstallingPWA(true);
+                      deferredInstallPrompt.current.prompt();
+                      const choice = await deferredInstallPrompt.current.userChoice;
+                      setIsInstallingPWA(false);
+                      if (choice.outcome === "accepted") {
+                        localStorage.setItem("pwa_install_dismissed", "1");
+                        setShowInstallBanner(false);
+                      }
+                      deferredInstallPrompt.current = null;
+                    }}
+                    disabled={isInstallingPWA}
+                    className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-stone-950 font-extrabold text-[11px] px-3 py-1.5 rounded-xl transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1"
+                  >
+                    {isInstallingPWA ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                    Install
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setShowInstallBanner(false);
+                    localStorage.setItem("pwa_install_dismissed", "1");
+                  }}
+                  className="text-stone-500 hover:text-stone-300 text-[10px] font-semibold transition-colors cursor-pointer px-1"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

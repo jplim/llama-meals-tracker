@@ -5,14 +5,34 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Meals Tracker</title>
-  
-  <!-- PWA & Mobile Web App settings -->
+  <meta name="description" content="Track and split group meal expenses with friends. Log meals, track calories, and settle up easily." />
+
+  <!-- PWA Web App Manifest -->
   <link rel="manifest" href="/manifest.json" />
+
+  <!-- Theme & color -->
   <meta name="theme-color" content="#f59e0b" />
   <meta name="color-scheme" content="light dark" />
+  <meta name="msapplication-TileColor" content="#1c1917" />
+  <meta name="msapplication-TileImage" content="/icon-192.png" />
+
+  <!-- iOS/Safari PWA ("Add to Home Screen") -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <meta name="apple-mobile-web-app-title" content="Meals" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <!-- iOS icons -->
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+
+  <!-- Prevent flash of wrong theme -->
   <script>
     try {
       const theme = localStorage.getItem("meal_tracker_theme") || "system";

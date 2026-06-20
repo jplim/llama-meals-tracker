@@ -1,22 +1,50 @@
 {
+  "id": "/",
   "name": "Meals Tracker",
   "short_name": "Meals",
   "description": "Collaborative group dining split ledger and calorie tracker.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#1c1917",
   "theme_color": "#f59e0b",
   "orientation": "portrait-primary",
+  "categories": ["food", "finance", "lifestyle"],
+  "lang": "en",
   "icons": [
     {
       "src": "/icon-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "/icon-512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Log a Meal",
+      "short_name": "Log Meal",
+      "description": "Quickly log a new group meal expense",
+      "url": "/?action=log",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }
